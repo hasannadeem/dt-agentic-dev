@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Node (POC app, weeks 2-3)
+node_modules/
+dist/
+coverage/
+*.log
+
+# Python (if POC tooling needs it)
+__pycache__/
+.venv/
+
+# Secrets — never commit keys
+.env
+.env.*
+*.pem
+
+# Claude Code local settings (user-specific)
+.claude/settings.local.json
+
+# Personal standup log — not project material
+standups/
