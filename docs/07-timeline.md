@@ -38,9 +38,10 @@ All research validated against current industry sources with citations; correcti
 ### M3 — Core POC Pipeline 🔄 (Aug 17–28, ~20 hrs)
 | Task | ETA |
 |---|---|
-| Spec approval gate exercised (SPEC-001) + planner agent → task breakdown | Aug 22 |
-| Developer agent implements tasks with tests on branches | Aug 26 |
-| Code-reviewer agent + GitHub Actions CI gates (lint, types, tests, coverage, security scan) | Aug 27 |
+| Spec approval gate exercised (SPEC-001) + planner agent → 3-task breakdown | ✅ Aug 21 |
+| GitHub Actions CI gates live (lint, types, tests on every PR) | ✅ Aug 21 |
+| First task implemented by developer agent (20 unit tests, all gates passing) | ✅ Aug 21 |
+| Code-reviewer agent + remaining tasks on branches | Aug 26 |
 | **First fully agent-generated PR, human-merged** | **Aug 28** |
 
 ### M4 — Cost Optimization (Aug 31 – Sep 4, ~10 hrs)
@@ -61,7 +62,7 @@ Monitoring integration for the deployed app; SRE agent for diagnosis and pre-app
 |---|---|---|
 | 1 ✅ | Aug 3–7 | Foundation + R&D docs + agent definitions |
 | 2 ✅ | Aug 10–14 | Validation research + R&D report + POC scaffold + first pipeline run |
-| 3 🔄 | Aug 17–21 | GitHub setup, timeline planning, spec approval + planner |
+| 3 🔄 | Aug 17–21 | GitHub setup, timeline, spec approved, planner + CI gates, first task implemented |
 | 4 | Aug 24–28 | Developer + reviewer agents, CI gates, **first agent PR** |
 | 5 | Aug 31–Sep 4 | Model benchmarking + cost routing |
 | 6–7 | Sep 7–18 | Hardening + repeatability + metrics |
