@@ -1,0 +1,31 @@
+{
+  "name": "poc-task-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "POC sample app built by the agent pipeline — a small task-tracker REST API",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --loader tsx src/server.ts",
+    "lint": "eslint src tests",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "gates": "npm run lint && npm run typecheck && npm run test"
+  },
+  "dependencies": {
+    "express": "^4.22.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.25",
+    "@types/node": "^26.2.0",
+    "@types/supertest": "^7.2.1",
+    "eslint": "^9.39.5",
+    "supertest": "^7.2.2",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^3.2.7"
+  }
+}
