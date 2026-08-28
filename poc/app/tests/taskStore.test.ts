@@ -44,28 +44,30 @@ describe('TaskStore', () => {
     it('marks an existing, incomplete task as completed and preserves other fields', () => {
       const store = new TaskStore();
       const created = store.create('Buy milk');
+      const before = { ...created };
 
       const completed = store.complete(created.id);
 
       expect(completed).toBeDefined();
       expect(completed?.completed).toBe(true);
-      expect(completed?.id).toBe(created.id);
-      expect(completed?.title).toBe(created.title);
-      expect(completed?.createdAt).toBe(created.createdAt);
+      expect(completed?.id).toBe(before.id);
+      expect(completed?.title).toBe(before.title);
+      expect(completed?.createdAt).toBe(before.createdAt);
     });
 
     it('is idempotent when called again on an already-completed task', () => {
       const store = new TaskStore();
       const created = store.create('Buy milk');
       store.complete(created.id);
+      const before = { ...created };
 
       const completedAgain = store.complete(created.id);
 
       expect(completedAgain).toBeDefined();
       expect(completedAgain?.completed).toBe(true);
-      expect(completedAgain?.id).toBe(created.id);
-      expect(completedAgain?.title).toBe(created.title);
-      expect(completedAgain?.createdAt).toBe(created.createdAt);
+      expect(completedAgain?.id).toBe(before.id);
+      expect(completedAgain?.title).toBe(before.title);
+      expect(completedAgain?.createdAt).toBe(before.createdAt);
     });
 
     it('returns undefined for an unknown id', () => {
