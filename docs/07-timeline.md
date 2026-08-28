@@ -41,8 +41,9 @@ All research validated against current industry sources with citations; correcti
 | Spec approval gate exercised (SPEC-001) + planner agent → 3-task breakdown | ✅ Aug 21 |
 | GitHub Actions CI gates live (lint, types, tests on every PR) | ✅ Aug 21 |
 | First task implemented by developer agent (20 unit tests, all gates passing) | ✅ Aug 21 |
-| Code-reviewer agent + remaining tasks on branches | Aug 26 |
-| **First fully agent-generated PR, human-merged** | **Aug 28** |
+| Remaining 2 tasks implemented by developer agent; code-reviewer agent reviewed all 3 (review caught 2 real issues, fixed and re-verified) | ✅ Aug 28 |
+| **3 agent-generated PRs open (#1–#3), CI green, 45 tests** — POC deliverable complete | ✅ **Aug 28** |
+| Human merge of the PR stack → SPEC-001 marked Implemented | pending lead |
 
 ### M4 — Cost Optimization (Aug 31 – Sep 4, ~10 hrs)
 Benchmark budget models (DeepSeek, Qwen, Kimi via OpenRouter) against the Claude baseline on identical tasks; spike OpenHands as budget-model executor; wire routing for task types that pass the quality bar. *Depends on the small POC budget approval.*
@@ -62,8 +63,8 @@ Monitoring integration for the deployed app; SRE agent for diagnosis and pre-app
 |---|---|---|
 | 1 ✅ | Aug 3–7 | Foundation + R&D docs + agent definitions |
 | 2 ✅ | Aug 10–14 | Validation research + R&D report + POC scaffold + first pipeline run |
-| 3 🔄 | Aug 17–21 | GitHub setup, timeline, spec approved, planner + CI gates, first task implemented |
-| 4 | Aug 24–28 | Developer + reviewer agents, CI gates, **first agent PR** |
+| 3 ✅ | Aug 17–21 | GitHub setup, timeline, spec approved, planner + CI gates, first task implemented |
+| 4 ✅ | Aug 24–28 | Developer + reviewer agents ran all 3 tasks; **first agent PRs open, CI green** — awaiting human merge |
 | 5 | Aug 31–Sep 4 | Model benchmarking + cost routing |
 | 6–7 | Sep 7–18 | Hardening + repeatability + metrics |
 | 8–9 | Sep 21–Oct 2 | Team scale-out + staging deployments |
