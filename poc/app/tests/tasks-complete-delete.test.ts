@@ -125,8 +125,9 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
     const completeDurations: number[] = [];
     for (const id of ids) {
       const start = performance.now();
-      await request(app).post(`/tasks/${id}/complete`);
+      const res = await request(app).post(`/tasks/${id}/complete`);
       completeDurations.push(performance.now() - start);
+      expect(res.status).toBe(200);
     }
 
     expect(p95(completeDurations)).toBeLessThan(100);
@@ -144,8 +145,9 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
     const deleteDurations: number[] = [];
     for (const id of ids) {
       const start = performance.now();
-      await request(app).delete(`/tasks/${id}`);
+      const res = await request(app).delete(`/tasks/${id}`);
       deleteDurations.push(performance.now() - start);
+      expect(res.status).toBe(204);
     }
 
     expect(p95(deleteDurations)).toBeLessThan(100);
