@@ -79,6 +79,19 @@ describe('POST /tasks', () => {
     expect(res.headers['content-type']).toMatch(/application\/json/);
     expect(res.body).toEqual({ error: { message: expect.any(String) } });
   });
+
+  it('returns 413 with the standard error body for a body over express.json()\'s size limit (not an HTML 413)', async () => {
+    // express.json()'s default limit is 100kb; send a JSON body comfortably over that.
+    const oversizedTitle = 'a'.repeat(200 * 1024);
+    const res = await request(createApp())
+      .post('/tasks')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ title: oversizedTitle }));
+
+    expect(res.status).toBe(413);
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.body).toEqual({ error: { message: expect.any(String) } });
+  });
 });
 
 describe('GET /tasks', () => {
@@ -124,25 +137,41 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
   // No dedicated perf-testing tool is present in poc/app's devDependencies.
   // This is an in-process timing smoke check against the in-memory store,
   // intended to catch gross regressions, not to be a rigorous benchmark.
-  it('p95 latency for POST /tasks and GET /tasks is under 100ms across a batch of sequential requests', async () => {
+  function p95(durations: number[]): number {
+    const sorted = [...durations].sort((a, b) => a - b);
+    const index = Math.floor(sorted.length * 0.95);
+    return sorted[index] ?? sorted[sorted.length - 1] ?? 0;
+  }
+
+  it('p95 latency for POST /tasks is under 100ms across a batch of sequential requests', async () => {
     const app = createApp();
     const requestCount = 30;
-    const durations: number[] = [];
+    const postDurations: number[] = [];
 
     for (let i = 0; i < requestCount; i += 1) {
       const start = performance.now();
       await request(app).post('/tasks').send({ title: `Task ${i}` });
-      durations.push(performance.now() - start);
-
-      const listStart = performance.now();
-      await request(app).get('/tasks');
-      durations.push(performance.now() - listStart);
+      postDurations.push(performance.now() - start);
     }
 
-    durations.sort((a, b) => a - b);
-    const p95Index = Math.floor(durations.length * 0.95);
-    const p95 = durations[p95Index] ?? durations[durations.length - 1];
+    expect(p95(postDurations)).toBeLessThan(100);
+  });
 
-    expect(p95).toBeLessThan(100);
+  it('p95 latency for GET /tasks is under 100ms across a batch of sequential requests', async () => {
+    const app = createApp();
+    const requestCount = 30;
+
+    for (let i = 0; i < requestCount; i += 1) {
+      await request(app).post('/tasks').send({ title: `Task ${i}` });
+    }
+
+    const getDurations: number[] = [];
+    for (let i = 0; i < requestCount; i += 1) {
+      const start = performance.now();
+      await request(app).get('/tasks');
+      getDurations.push(performance.now() - start);
+    }
+
+    expect(p95(getDurations)).toBeLessThan(100);
   });
 });
