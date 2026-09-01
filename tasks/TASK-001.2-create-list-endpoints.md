@@ -3,7 +3,7 @@
 **Spec:** SPEC-001 (specs/SPEC-001-task-crud-api.md)
 **Size:** M
 **Depends on:** TASK-001.1 (task model, store, validation, error helper)
-**Status:** Todo
+**Status:** In review
 **Branch:** task/001.2-create-list-endpoints
 
 ## Intent
@@ -35,3 +35,7 @@ Wire `POST /tasks` (create, with validation) and `GET /tasks` (list) into `src/a
 
 - Parallel-with-caveat: this task is logically independent of TASK-001.3 (different endpoints, both depend only on TASK-001.1), but both tasks add route registrations to `src/app.ts` (or the same router file). If run in parallel by separate developer agents, expect a merge conflict on that file — the orchestrator should either serialize these two tasks' merges, or have each task add its routes via a distinct router module (e.g. one router per file) mounted independently to minimize overlap. Flagging here per CLAUDE.md's "ask, don't silently improvise" — do not resolve a merge conflict by dropping the other task's routes.
 - If acceptance criterion #13's latency budget cannot be meaningfully verified without added tooling, stop after the standard 2 fix attempts and escalate per docs/01-research/model-routing-strategy.md rather than skip the check silently.
+
+**Implementation note:** Criterion #8's latency budget was verified with a lightweight in-process smoke test (`poc/app/tests/tasks.test.ts`, "performance smoke check" describe block) — 30 sequential POST/GET round trips against `supertest` + the in-memory store, asserting p95 < 100ms. This is explicitly documented in the test as a POC-scale smoke check, not a load-test harness, since no dedicated perf-testing tool is in `poc/app`'s devDependencies. No escalation was needed; the check was feasible as specified.
+
+This task branched off `task/001.1-task-model-and-store` (not yet merged to `main` at time of writing; PR #1 open) per its dependency, rather than off `main`.
