@@ -49,6 +49,24 @@ export function createApp(): express.Express {
     res.json(store.list());
   });
 
+  app.post('/tasks/:id/complete', (req, res) => {
+    const task = store.complete(req.params.id);
+    if (!task) {
+      sendError(res, 404, `task not found: ${req.params.id}`);
+      return;
+    }
+    res.status(200).json(task);
+  });
+
+  app.delete('/tasks/:id', (req, res) => {
+    const removed = store.remove(req.params.id);
+    if (!removed) {
+      sendError(res, 404, `task not found: ${req.params.id}`);
+      return;
+    }
+    res.status(204).end();
+  });
+
   // Feature routes are added by the developer agent, one task branch at a time.
   // See specs/ for approved specs and tasks/ for the task breakdown.
 
