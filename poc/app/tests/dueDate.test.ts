@@ -34,6 +34,22 @@ describe('validateDueDate', () => {
     }
   });
 
+  it('accepts a Z-suffixed timestamp with no milliseconds', () => {
+    const result = validateDueDate('2026-09-10T12:00:00Z');
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.dueDate).toBe('2026-09-10T12:00:00Z');
+    }
+  });
+
+  it('accepts a Z-suffixed timestamp with 3-digit milliseconds', () => {
+    const result = validateDueDate('2026-09-10T12:00:00.000Z');
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      expect(result.dueDate).toBe('2026-09-10T12:00:00.000Z');
+    }
+  });
+
   it('rejects a non-string dueDate (number)', () => {
     const result = validateDueDate(42);
     expect(result.valid).toBe(false);
@@ -58,12 +74,28 @@ describe('validateDueDate', () => {
     }
   });
 
+  it.each([
+    ['a bare date with no time component', '2026-09-10'],
+    ['a timezone-less timestamp', '2026-09-10T00:00:00'],
+    ['a timestamp with a numeric UTC offset instead of Z', '2026-09-10T05:30:00+05:30'],
+    ['a locale-formatted date string', 'March 5, 2026'],
+    ['a numeric string parseable as garbage', '42'],
+    ['a rolled-over/impossible calendar date', '2026-02-30T00:00:00.000Z'],
+  ])('rejects %s: %j', (_desc, value) => {
+    const result = validateDueDate(value);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.reason).toBeTruthy();
+    }
+  });
+
   it('produces distinct reasons for different rejection cases', () => {
     const nonString = validateDueDate(42);
     const empty = validateDueDate('');
     const unparseable = validateDueDate('not-a-date');
+    const impossible = validateDueDate('2026-02-30T00:00:00.000Z');
 
-    const reasons = [nonString, empty, unparseable]
+    const reasons = [nonString, empty, unparseable, impossible]
       .filter((r): r is { valid: false; reason: string } => !r.valid)
       .map((r) => r.reason);
 

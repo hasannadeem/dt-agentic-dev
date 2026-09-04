@@ -7,10 +7,10 @@
 ## Open questions & assumptions
 
 <!-- Deliberately first: the approver reads the doubts before the plan. -->
-- **Q:** What format is `dueDate`?
-  **A (assumption):** ISO 8601 UTC timestamp string (same convention as `createdAt`, e.g. `2026-09-10T00:00:00.000Z`), not a bare date. Server does not localize or accept timezone offsets other than what `Date` parsing supports.
+- **Q:** What format is `dueDate`? <!-- Amended during TASK-002.1 review: the original wording ("ISO 8601 UTC timestamp... not a bare date... whatever `Date` parsing supports") was too loose — native `Date` parsing accepts bare dates, timezone-less timestamps, numeric offsets, and even locale strings like "March 5, 2026", none of which should be valid `dueDate` input. Grammar pinned here per reviewer finding. -->
+  **A (assumption, amended):** `dueDate` must match the strict grammar `YYYY-MM-DDTHH:mm:ss[.SSS]Z` — an explicit `Z` (UTC) suffix is required; milliseconds are optional (1-3 digits, e.g. both `2026-09-10T00:00:00Z` and `2026-09-10T00:00:00.000Z` are accepted and treated as equal). The string must also represent a real calendar datetime — e.g. `2026-02-30T00:00:00.000Z` is rejected even though it matches the grammar, because February has no 30th. Rejected (400): bare dates (`2026-09-10`), timezone-less timestamps (`2026-09-10T00:00:00`), numeric-offset timestamps (`2026-09-10T05:30:00+05:30`), locale strings (`March 5, 2026`), non-date strings/numbers, and impossible calendar dates.
 - **Q:** Is `dueDate` required on create?
-  **A (assumption):** Optional. `POST /tasks` accepts an optional `dueDate` field; omitted → stored as `null`. This keeps SPEC-001's `POST /tasks` backward compatible (no existing client breaks).
+  **A (assumption):** Optional. `POST /tasks` accepts an optional `dueDate` field; omitted → stored as `null`. Explicit JSON `null` (`{"dueDate": null}`) is treated the same as omitted — stored as `null`, not rejected. This keeps SPEC-001's `POST /tasks` backward compatible (no existing client breaks).
 - **Q:** Can `dueDate` be set or changed after creation?
   **A (assumption):** No. SPEC-001 has no generic update endpoint (`PATCH`), and this requirement doesn't ask for one. Setting `dueDate` is create-time only. Editing due dates post-creation is explicitly out of scope here.
 - **Q:** Does completing a task remove it from the overdue list?
@@ -25,7 +25,7 @@
   **A (assumption):** Order only. Response items are plain task objects (same shape as `GET /tasks`); no computed `overdueBy` field. Flagging this for approver — if the demo/UI needs a human-readable "N days overdue," that's a follow-up requirement.
 - **Q:** Is a `dueDate` in the past at creation time rejected?
   **A (assumption):** No validation against "must be in the future." A task can be created already overdue (e.g. backfilled/import scenarios); only format is validated.
-- **Q:** What happens with a malformed `dueDate` (not a string, not parseable as a date)?
+- **Q:** What happens with a malformed `dueDate` (not a string, not matching the pinned grammar above, or not a real calendar date)?
   **A (assumption):** `400` with the standard `{"error": {"message": "<reason>"}}` shape, same pattern as title validation; no task is created.
 
 ## Problem
