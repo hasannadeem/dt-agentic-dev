@@ -58,6 +58,14 @@ export function createApp(): express.Express {
     res.json(store.list());
   });
 
+  // Registered as a static path ('/tasks/overdue'), not a param route, so it
+  // cannot collide with any '/tasks/:id' pattern regardless of registration
+  // order — Express matches the literal segment before it would ever treat
+  // "overdue" as an :id value on a different route.
+  app.get('/tasks/overdue', (_req, res) => {
+    res.json(store.listOverdue());
+  });
+
   app.post('/tasks/:id/complete', (req, res) => {
     const task = store.complete(req.params.id);
     if (!task) {

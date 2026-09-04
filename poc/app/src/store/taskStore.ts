@@ -56,4 +56,24 @@ export class TaskStore {
   remove(id: string): boolean {
     return this.tasks.delete(id);
   }
+
+  /**
+   * Returns incomplete tasks whose `dueDate` is earlier than `now`
+   * (milliseconds since epoch, UTC; defaults to `Date.now()`), sorted
+   * ascending by `dueDate` with `createdAt`-ascending tiebreak (matching
+   * SPEC-001's stable-order convention). Tasks with `dueDate: null`,
+   * completed tasks, and tasks whose `dueDate` has not yet passed are
+   * excluded. `now` is exposed as a parameter for deterministic testing.
+   */
+  listOverdue(now: number = Date.now()): Task[] {
+    return this.list()
+      .filter((task) => !task.completed && task.dueDate !== null && Date.parse(task.dueDate) < now)
+      .sort((a, b) => {
+        const dueDateDiff = Date.parse(a.dueDate as string) - Date.parse(b.dueDate as string);
+        if (dueDateDiff !== 0) {
+          return dueDateDiff;
+        }
+        return Date.parse(a.createdAt) - Date.parse(b.createdAt);
+      });
+  }
 }
