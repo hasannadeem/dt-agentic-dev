@@ -2,9 +2,17 @@ import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 
-async function createTask(app: ReturnType<typeof createApp>, title: string) {
-  const res = await request(app).post('/tasks').send({ title });
-  return res.body as { id: string; title: string; completed: boolean; createdAt: string };
+async function createTask(app: ReturnType<typeof createApp>, title: string, dueDate?: string) {
+  const res = await request(app)
+    .post('/tasks')
+    .send(dueDate === undefined ? { title } : { title, dueDate });
+  return res.body as {
+    id: string;
+    title: string;
+    completed: boolean;
+    createdAt: string;
+    dueDate: string | null;
+  };
 }
 
 describe('POST /tasks/:id/complete', () => {
@@ -20,6 +28,7 @@ describe('POST /tasks/:id/complete', () => {
       title: created.title,
       completed: true,
       createdAt: created.createdAt,
+      dueDate: null,
     });
   });
 
@@ -38,6 +47,7 @@ describe('POST /tasks/:id/complete', () => {
       title: created.title,
       completed: true,
       createdAt: created.createdAt,
+      dueDate: null,
     });
   });
 
@@ -49,6 +59,22 @@ describe('POST /tasks/:id/complete', () => {
     expect(res.status).toBe(404);
     expect(res.headers['content-type']).toMatch(/application\/json/);
     expect(res.body).toEqual({ error: { message: expect.any(String) } });
+  });
+
+  it('returns the task\'s unchanged dueDate when completing a task created with a dueDate (SPEC-002 #5)', async () => {
+    const app = createApp();
+    const created = await createTask(app, 'Pay rent', '2026-09-10T00:00:00.000Z');
+
+    const res = await request(app).post(`/tasks/${created.id}/complete`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      id: created.id,
+      title: created.title,
+      completed: true,
+      createdAt: created.createdAt,
+      dueDate: '2026-09-10T00:00:00.000Z',
+    });
   });
 });
 

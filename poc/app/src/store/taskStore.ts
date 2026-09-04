@@ -7,17 +7,20 @@ export class TaskStore {
   private readonly tasks = new Map<string, Task>();
 
   /**
-   * Creates a new task from a (already-validated) title. Server-generates
-   * `id` and `createdAt`; `completed` always starts `false`. Any caller
-   * intent to set `id`, `createdAt`, or `completed` directly is ignored —
-   * this method only accepts a `title`.
+   * Creates a new task from a (already-validated) title and an optional
+   * (already-validated) dueDate. Server-generates `id` and `createdAt`;
+   * `completed` always starts `false`. `dueDate` is stored verbatim, and
+   * defaults to `null` if omitted. Any caller intent to set `id`,
+   * `createdAt`, or `completed` directly is ignored — this method only
+   * accepts a `title` and `dueDate`.
    */
-  create(title: string): Task {
+  create(title: string, dueDate: string | null = null): Task {
     const task: Task = {
       id: crypto.randomUUID(),
       title,
       completed: false,
       createdAt: new Date().toISOString(),
+      dueDate,
     };
     this.tasks.set(task.id, task);
     return task;

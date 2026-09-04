@@ -3,4 +3,5 @@ export interface Task {
   title: string;
   completed: boolean;
   createdAt: string;
+  dueDate: string | null;
 }

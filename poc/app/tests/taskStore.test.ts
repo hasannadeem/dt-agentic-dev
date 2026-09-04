@@ -22,6 +22,20 @@ describe('TaskStore', () => {
 
       expect(first.id).not.toBe(second.id);
     });
+
+    it('defaults dueDate to null when omitted', () => {
+      const store = new TaskStore();
+      const task = store.create('Buy milk');
+
+      expect(task.dueDate).toBeNull();
+    });
+
+    it('stores a given dueDate verbatim', () => {
+      const store = new TaskStore();
+      const task = store.create('Pay rent', '2026-09-10T00:00:00.000Z');
+
+      expect(task.dueDate).toBe('2026-09-10T00:00:00.000Z');
+    });
   });
 
   describe('list', () => {
@@ -73,6 +87,15 @@ describe('TaskStore', () => {
     it('returns undefined for an unknown id', () => {
       const store = new TaskStore();
       expect(store.complete('unknown-id')).toBeUndefined();
+    });
+
+    it('leaves dueDate unchanged when completing a task', () => {
+      const store = new TaskStore();
+      const created = store.create('Pay rent', '2026-09-10T00:00:00.000Z');
+
+      const completed = store.complete(created.id);
+
+      expect(completed?.dueDate).toBe('2026-09-10T00:00:00.000Z');
     });
   });
 

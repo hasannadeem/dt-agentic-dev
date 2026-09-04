@@ -2,6 +2,7 @@ import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { sendError } from './errors.js';
 import { TaskStore } from './store/taskStore.js';
+import { validateDueDate } from './validation/dueDate.js';
 import { validateTaskTitle } from './validation/taskTitle.js';
 
 /**
@@ -35,13 +36,21 @@ export function createApp(): express.Express {
   });
 
   app.post('/tasks', (req, res) => {
-    const result = validateTaskTitle((req.body as { title?: unknown } | undefined)?.title);
-    if (!result.valid) {
-      sendError(res, 400, result.reason);
+    const body = req.body as { title?: unknown; dueDate?: unknown } | undefined;
+
+    const titleResult = validateTaskTitle(body?.title);
+    if (!titleResult.valid) {
+      sendError(res, 400, titleResult.reason);
       return;
     }
 
-    const task = store.create(result.title);
+    const dueDateResult = validateDueDate(body?.dueDate);
+    if (!dueDateResult.valid) {
+      sendError(res, 400, dueDateResult.reason);
+      return;
+    }
+
+    const task = store.create(titleResult.title, dueDateResult.dueDate);
     res.status(201).json(task);
   });
 
