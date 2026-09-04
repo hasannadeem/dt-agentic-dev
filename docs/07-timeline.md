@@ -43,8 +43,9 @@ Spec approved (human gate) → planner → 3 tasks → developer agent implement
 | Task | ETA |
 |---|---|
 | PR roll-up merged; spec/tasks bookkeeping closed | ✅ Sep 2 |
-| Modular stage commands — each agent independently triggerable (`/pipeline-spec`, `/pipeline-plan`, `/pipeline-dev`, `/pipeline-review`, `/pipeline-status`) instead of raw prompts | Sep 5 |
-| Demo runbook + refined requirements set for the next pipeline run | Sep 5 |
+| Modular stage commands — each agent independently triggerable (`/pipeline-spec`, `/pipeline-plan`, `/pipeline-dev`, `/pipeline-review`, `/pipeline-status`) instead of raw prompts | ✅ Sep 4 |
+| Demo runbook + refined requirements set for the next pipeline run | ✅ Sep 4 |
+| **Full pipeline rehearsal (run #2, SPEC-002 due dates)**: spec approved → 2 tasks → developer + reviewer (review caught a timezone-dependence bug pre-merge) → 2 PRs, 100 tests — repeatability data point pulled forward from M5, logged in [metrics-log.md](metrics-log.md) | ✅ Sep 4 |
 | **Full team demo: live run of a new requirement through the pipeline** | **week of Sep 7** |
 | Human-in-the-loop refined per sponsor direction: humans own acceptance-criteria definition + final check; everything between runs on auto | Sep 11 |
 
