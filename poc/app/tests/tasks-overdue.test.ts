@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
+import { TaskStore } from '../src/store/taskStore.js';
 
 // Fixed, deterministic ISO 8601 UTC strings — always in the past/future
 // relative to any real wall-clock time this suite will ever run at, so
@@ -125,6 +126,31 @@ describe('GET /tasks/overdue', () => {
     expect((res.body as TaskBody[]).map((t) => t.id)).toEqual([createdFirst.id, createdSecond.id]);
   });
 
+  it('orders two overdue tasks with mixed-precision dueDate strings by actual chronological value, not string comparison (SPEC-002 #11 — kills string-comparator mutation)', async () => {
+    const app = createApp();
+    // "…T00:00:00Z" (no ms, i.e. .000) is chronologically earlier than
+    // "…T00:00:00.500Z", even though '.' (0x2E) sorts before 'Z' (0x5A)
+    // lexicographically — a naive string comparator would reverse this pair.
+    const earlier = await createTask(app, 'Earlier (no ms)', '2020-01-01T00:00:00Z');
+    const later = await createTask(app, 'Later (.500 ms)', '2020-01-01T00:00:00.500Z');
+
+    const res = await request(app).get('/tasks/overdue');
+
+    expect(res.status).toBe(200);
+    expect((res.body as TaskBody[]).map((t) => t.id)).toEqual([earlier.id, later.id]);
+  });
+
+  it('orders a .999ms-precision dueDate before a later bare-seconds dueDate one second on (SPEC-002 #11 — kills string-comparator mutation)', async () => {
+    const app = createApp();
+    const earlier = await createTask(app, 'Earlier (.999 ms)', '2020-01-01T00:00:00.999Z');
+    const later = await createTask(app, 'Later (no ms, next second)', '2020-01-01T00:00:01Z');
+
+    const res = await request(app).get('/tasks/overdue');
+
+    expect(res.status).toBe(200);
+    expect((res.body as TaskBody[]).map((t) => t.id)).toEqual([earlier.id, later.id]);
+  });
+
   it('no longer includes a task after it is completed via POST /tasks/:id/complete (SPEC-002 #13)', async () => {
     const app = createApp();
     const overdue = await createTask(app, 'Overdue', PAST_1);
@@ -240,14 +266,19 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
   }
 
   it('p95 latency for GET /tasks/overdue is under 150ms with up to 1,000 tasks seeded, sampled at a rate consistent with 20 requests/sec (SPEC-002 #16)', async () => {
-    const app = createApp();
+    // Seeded in-process via a directly-constructed TaskStore, not via 1,000
+    // sequential supertest/HTTP requests — seeding at that volume through
+    // real sockets caused intermittent socket hang-ups under full-suite
+    // parallelism. The 20 measured requests below still go through the
+    // real HTTP layer via supertest, so the latency being measured is
+    // still the full GET /tasks/overdue request path.
+    const seedStore = new TaskStore();
     const seedCount = 1000;
     for (let i = 0; i < seedCount; i += 1) {
       const dueDate = i % 2 === 0 ? PAST_1 : FUTURE;
-      await request(app)
-        .post('/tasks')
-        .send({ title: `Task ${i}`, dueDate });
+      seedStore.create(`Task ${i}`, dueDate);
     }
+    const app = createApp(seedStore);
 
     const requestCount = 20;
     const overdueDurations: number[] = [];

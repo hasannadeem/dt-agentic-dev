@@ -25,11 +25,16 @@ function getHttpErrorStatus(err: unknown): number | undefined {
   return undefined;
 }
 
-export function createApp(): express.Express {
+/**
+ * Builds the Express app. Accepts an optional `store` so tests can seed
+ * state directly (in-process, bypassing HTTP) before wiring it into the
+ * app — e.g. for perf smoke checks that need many tasks without the
+ * overhead/flakiness of seeding via hundreds of supertest requests.
+ * Defaults to a fresh, empty `TaskStore` when omitted.
+ */
+export function createApp(store: TaskStore = new TaskStore()): express.Express {
   const app = express();
   app.use(express.json());
-
-  const store = new TaskStore();
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -58,10 +63,12 @@ export function createApp(): express.Express {
     res.json(store.list());
   });
 
-  // Registered as a static path ('/tasks/overdue'), not a param route, so it
-  // cannot collide with any '/tasks/:id' pattern regardless of registration
-  // order — Express matches the literal segment before it would ever treat
-  // "overdue" as an :id value on a different route.
+  // Registered as a static path ('/tasks/overdue'), which currently cannot
+  // collide with any '/tasks/:id' pattern because those are only registered
+  // on POST/DELETE, not GET. Express matches routes in registration order,
+  // so if a GET '/tasks/:id' route is ever added, this route MUST stay
+  // registered before it — otherwise the param route would shadow this one
+  // by treating "overdue" as an :id value.
   app.get('/tasks/overdue', (_req, res) => {
     res.json(store.listOverdue());
   });
