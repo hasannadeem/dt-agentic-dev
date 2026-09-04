@@ -3,7 +3,7 @@
 **Spec:** SPEC-001 (specs/SPEC-001-task-crud-api.md)
 **Size:** S
 **Depends on:** none — parallelizable (foundational; TASK-001.2 and TASK-001.3 depend on this)
-**Status:** In review
+**Status:** Done
 **Branch:** task/001.1-task-model-and-store
 
 ## Intent

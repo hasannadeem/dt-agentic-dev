@@ -1,8 +1,8 @@
 # Project Timeline & Module Plan
 
 **Project:** Agentic Software-Development Platform · **Lead:** Hasnat Ahmed (part-time, ~10 hrs/week)
-**Started:** week of Aug 3, 2026 · **Planned completion: Oct 16, 2026** · **Total duration: ~11 weeks (~110 hours)**
-**Prepared:** Aug 21, 2026, for progress tracking (requested by Tehreem Raghib)
+**Started:** week of Aug 3, 2026 · **Planned completion: Oct 23, 2026** · **Total duration: ~12 weeks (~115 hours)**
+**Re-planned:** Sep 2, 2026, after sponsor review — modularity and team demo pulled forward, cost optimization deferred to the last step (sponsor decision); milestones sized to 1–2 week visible increments.
 
 ## Status at a glance
 
@@ -10,52 +10,57 @@
 |---|---|---|
 | M1 — Research & Foundation | Aug 3 – Aug 7 | ✅ Done |
 | M2 — Validation & R&D Report | Aug 10 – Aug 14 | ✅ Done |
-| M3 — Core POC Pipeline | Aug 17 – Aug 28 | 🔄 In progress |
-| M4 — Cost Optimization (model routing) | Aug 31 – Sep 4 | Planned |
-| M5 — Hardening (QA, security, performance) | Sep 7 – Sep 18 | Planned |
-| M6 — Scale-out (team usage, deployment) | Sep 21 – Oct 2 | Planned |
-| M7 — Monitoring & SRE agent | Oct 5 – Oct 16 | Planned |
+| M3 — Core POC Pipeline | Aug 17 – Sep 2 | ✅ Done — PRs merged, SPEC-001 Implemented |
+| M4 — Modularity & Team Demo | Sep 1 – Sep 11 | 🔄 In progress |
+| M5 — Hardening & Repeatability | Sep 14 – Sep 25 | Planned |
+| M6 — Team Handoff & Cross-Platform | Sep 28 – Oct 9 | Planned |
+| M7 — Cost Optimization (moved last, sponsor decision) | Oct 12 – Oct 23 | Planned |
 
 ## Major milestones
 
 | Date | Milestone |
 |---|---|
-| Aug 14 ✅ | Complete R&D report delivered and reviewed with Hasan |
-| **Aug 28** | **First fully agent-generated pull request** (POC deliverable complete: requirement → spec → tasks → code → tests → PR) |
-| Sep 4 | Cost-routing decision backed by benchmark data (premium vs budget models) |
-| Sep 18 | Pipeline proven repeatable (second full run, metrics for speed/quality/cost) |
-| Oct 2 | Platform usable by other developers (operator guide, issue-triggered runs, staging deploys) |
-| **Oct 16** | **Platform v1 complete** (monitoring/SRE agent live; full lifecycle covered) |
+| Aug 14 ✅ | Complete R&D report delivered and reviewed with sponsor |
+| Aug 28 ✅ | First fully agent-generated pull requests, CI green |
+| Sep 2 ✅ | **POC complete end-to-end** — PRs human-merged, SPEC-001 Implemented (requirement → spec → tasks → code → tests → PR → merge) |
+| **week of Sep 7** | **Full team demo** — live pipeline run, modular stage commands |
+| Sep 25 | Pipeline hardened (security/perf/QA) and proven repeatable (second full run with metrics) |
+| Oct 9 | Other developers using the pipeline on their own machines (Windows + Mac) |
+| **Oct 23** | **Platform v1 complete** — including data-backed cost-routing decision |
 
 ## Module details
 
-### M1 — Research & Foundation ✅ (Aug 3–7, 10 hrs — done)
-Project repo and structure; complete R&D documentation (spec-driven development evaluation, tools/framework comparison, model routing strategy, end-to-end architecture, governance and human approval points, success metrics); 7 specialized agents defined (requirements analyst, planner, architect, developer, code reviewer, QA engineer, security auditor).
+### M1 — Research & Foundation ✅ (Aug 3–7)
+Repo, complete R&D documentation (spec-driven development evaluation, tooling comparison, model routing strategy, architecture, governance, metrics); 7 specialized agents defined.
 
-### M2 — Validation & R&D Report ✅ (Aug 10–14, 10 hrs — done)
-All research validated against current industry sources with citations; corrections applied (model pricing, executor framework decision — OpenHands selected over OpenClaw/Hermes after security assessment); consolidated R&D report compiled and reviewed with Hasan; POC app scaffolded (Node/TypeScript API with lint/type/test gates green); first live pipeline run — requirements-analyst agent produced SPEC-001 draft; agent guardrails enforced (protected files blocked); repo live on GitHub.
+### M2 — Validation & R&D Report ✅ (Aug 10–14)
+All research validated against current sources with citations; OpenHands selected over OpenClaw/Hermes after security assessment; consolidated R&D report reviewed with sponsor; POC app scaffolded; first pipeline run produced SPEC-001; guardrails enforced; repo on GitHub.
 
-### M3 — Core POC Pipeline 🔄 (Aug 17–28, ~20 hrs)
+### M3 — Core POC Pipeline ✅ (Aug 17 – Sep 2)
+Spec approved (human gate) → planner → 3 tasks → developer agent implemented all with 45 tests → code-reviewer agent caught 2 real issues, fixed and re-verified → CI gates green → 4 PRs → human-merged Sep 2. SPEC-001 marked Implemented. The POC deliverable from the original brief is complete.
+
+### M4 — Modularity & Team Demo 🔄 (Sep 1–11, ~15 hrs)
 | Task | ETA |
 |---|---|
-| Spec approval gate exercised (SPEC-001) + planner agent → 3-task breakdown | ✅ Aug 21 |
-| GitHub Actions CI gates live (lint, types, tests on every PR) | ✅ Aug 21 |
-| First task implemented by developer agent (20 unit tests, all gates passing) | ✅ Aug 21 |
-| Remaining 2 tasks implemented by developer agent; code-reviewer agent reviewed all 3 (review caught 2 real issues, fixed and re-verified) | ✅ Aug 28 |
-| **3 agent-generated PRs open (#1–#3), CI green, 45 tests** — POC deliverable complete | ✅ **Aug 28** |
-| Human merge of the PR stack → SPEC-001 marked Implemented | pending lead |
+| PR roll-up merged; spec/tasks bookkeeping closed | ✅ Sep 2 |
+| Modular stage commands — each agent independently triggerable (`/pipeline-spec`, `/pipeline-plan`, `/pipeline-dev`, `/pipeline-review`, `/pipeline-status`) instead of raw prompts | Sep 5 |
+| Demo runbook + refined requirements set for the next pipeline run | Sep 5 |
+| **Full team demo: live run of a new requirement through the pipeline** | **week of Sep 7** |
+| Human-in-the-loop refined per sponsor direction: humans own acceptance-criteria definition + final check; everything between runs on auto | Sep 11 |
 
-### M4 — Cost Optimization (Aug 31 – Sep 4, ~10 hrs)
-Benchmark budget models (DeepSeek, Qwen, Kimi via OpenRouter) against the Claude baseline on identical tasks; spike OpenHands as budget-model executor; wire routing for task types that pass the quality bar. *Depends on the small POC budget approval.*
+### M5 — Hardening & Repeatability (Sep 14–25, ~20 hrs)
+Security hardening (security-auditor in the loop), performance optimization (perf budgets as CI gate), QA hardening (qa-engineer black-box runs); second full pipeline run on a fresh requirement (SPEC-002 due dates) proving repeatability; metrics collected per feature.
 
-### M5 — Hardening (Sep 7–18, ~20 hrs)
-Security-auditor and QA-engineer agents join the pipeline; performance smoke tests with budgets become a CI gate; mutation testing on agent-written tests; second full pipeline run on fresh requirements to prove repeatability; metrics collected (cycle time, first-pass quality, cost per feature).
+### M6 — Team Handoff & Cross-Platform (Sep 28 – Oct 9, ~20 hrs)
+Operator guide; developers clone the repo, run the pipeline themselves, and give feedback; **Windows + Mac support verified** (HubbleCap constraint); issue-triggered headless runs on GitHub Actions.
 
-### M6 — Scale-out (Sep 21 – Oct 2, ~20 hrs)
-Operator guide; 1–2 developers onboarded to use the pipeline; issue-triggered automatic pipeline runs (GitHub Actions); deployment agent for a staging environment with human-approved deploys.
+### M7 — Cost Optimization (Oct 12–23, ~20 hrs) — deliberately last, per sponsor decision Sep 2
+Benchmark budget models (DeepSeek, Qwen, Kimi via OpenRouter) against the Claude baseline on identical, by-then-hardened tasks; OpenHands executor spike; wire routing for task types that pass the quality bar; final metrics report and v1 handover.
 
-### M7 — Monitoring & SRE (Oct 5–16, ~20 hrs)
-Monitoring integration for the deployed app; SRE agent for diagnosis and pre-approved runbook remediation (restart/scale/rollback), everything else escalating to a human; final metrics report and platform v1 handover.
+## Backlog (post-v1, noted from sponsor review)
+- **Autonomous variant for vibe-coded apps**: pipeline mode for codebases with no docs/specs — agents derive behavior by exploratory testing first, then spec retroactively. Ties into the vibe-code-rescue service offering.
+- Deployment agent + staging environment; monitoring/SRE agent once something is deployed.
+- Case-study material: the per-feature metrics log doubles as before/after evidence for client-facing case studies.
 
 ## Weekly schedule
 
@@ -63,16 +68,17 @@ Monitoring integration for the deployed app; SRE agent for diagnosis and pre-app
 |---|---|---|
 | 1 ✅ | Aug 3–7 | Foundation + R&D docs + agent definitions |
 | 2 ✅ | Aug 10–14 | Validation research + R&D report + POC scaffold + first pipeline run |
-| 3 ✅ | Aug 17–21 | GitHub setup, timeline, spec approved, planner + CI gates, first task implemented |
-| 4 ✅ | Aug 24–28 | Developer + reviewer agents ran all 3 tasks; **first agent PRs open, CI green** — awaiting human merge |
-| 5 | Aug 31–Sep 4 | Model benchmarking + cost routing |
-| 6–7 | Sep 7–18 | Hardening + repeatability + metrics |
-| 8–9 | Sep 21–Oct 2 | Team scale-out + staging deployments |
-| 10–11 | Oct 5–16 | Monitoring + SRE agent + v1 handover |
+| 3 ✅ | Aug 17–21 | GitHub setup, timeline, spec approved, planner + CI gates, first task |
+| 4 ✅ | Aug 24–28 | All 3 tasks through developer + reviewer agents; first agent PRs, CI green |
+| 5 ✅ | Sep 1–4 | PRs merged (POC complete); re-plan per sponsor review; modular commands |
+| 6 | Sep 7–11 | **Full team demo**; requirements refinement; HITL polish |
+| 7–8 | Sep 14–25 | Security/perf/QA hardening + repeatability run |
+| 9–10 | Sep 28–Oct 9 | Operator guide, dev handoff, Windows+Mac, issue-triggered runs |
+| 11–12 | Oct 12–23 | Cost benchmarking + routing + v1 handover |
 
 ## Assumptions & notes
 
-- Dates assume ~10 hrs/week of availability. If a week's hours drop, dates shift accordingly — scope is cut before quality is (later modules slip first).
-- M4 depends on the small POC budget (raised with Hasan); if approval moves, M4 swaps with M5 rather than blocking the timeline.
-- M6–M7 assume a staging environment can be provisioned in company infrastructure; if not, M7 runs against a temporary environment.
-- After v1 (Oct 16): the platform is applied to a first real internal project and improved iteratively — scoped separately once v1 lands.
+- Dates assume ~10 hrs/week; slips cut scope, not quality (later modules slip first).
+- M7 needs the small OpenRouter credit; being last, there's no schedule dependency on its approval anymore.
+- M6 assumes 1–2 devs get a few hours to try the pipeline; Windows verification needs one Windows machine.
+- After v1: apply the pipeline to a first real internal project; scoped separately.

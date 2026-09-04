@@ -18,6 +18,9 @@ Approach: a practical 70% implementation delivered quickly and improved iterativ
 |---|---|
 | [docs/06-rd-report.md](docs/06-rd-report.md) | **Consolidated R&D report — start here** (the sponsor-facing summary of everything below) |
 | [docs/07-timeline.md](docs/07-timeline.md) | Project timeline: modules, ETAs, milestones, weekly schedule |
+| [docs/08-operator-guide.md](docs/08-operator-guide.md) | How any developer clones and runs the pipeline (Mac/Windows) |
+| [docs/09-demo-runbook.md](docs/09-demo-runbook.md) | Live team-demo script with fallback plan |
+| [.claude/commands/](.claude/commands/) | Modular stage commands: /pipeline-spec → plan → dev → review, /pipeline-status |
 | [docs/00-charter.md](docs/00-charter.md) | Project charter: goals, stakeholders, working model |
 | [docs/01-research/](docs/01-research/) | R&D findings: spec-driven development evaluation, tooling comparison, model-routing strategy |
 | [docs/02-architecture.md](docs/02-architecture.md) | Proposed end-to-end architecture |

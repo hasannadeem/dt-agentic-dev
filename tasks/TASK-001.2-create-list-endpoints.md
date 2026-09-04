@@ -3,7 +3,7 @@
 **Spec:** SPEC-001 (specs/SPEC-001-task-crud-api.md)
 **Size:** M
 **Depends on:** TASK-001.1 (task model, store, validation, error helper)
-**Status:** In review
+**Status:** Done
 **Branch:** task/001.2-create-list-endpoints
 
 ## Intent

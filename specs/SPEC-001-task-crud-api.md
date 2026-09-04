@@ -1,6 +1,6 @@
 # SPEC-001: Task CRUD API
 
-**Status:** Approved <!-- Approved by Hasnat Ahmed, 2026-08-21, via pipeline approval gate -->
+**Status:** Implemented <!-- Implemented 2026-09-02: PRs #1-#4 merged to main by lead -->
 **Requirement source:** poc/README.md sample requirements queue, item #1
 **Date:** 2026-08-14
 

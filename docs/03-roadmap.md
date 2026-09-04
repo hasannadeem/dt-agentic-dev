@@ -2,55 +2,42 @@
 
 Sized for ~10 hrs/week of lead time. Each phase ends with something demonstrable — 70% working now beats 100% later.
 
-## Week 1 — Foundation ✅ (this week)
+> **Re-planned 2026-09-02 after sponsor review.** Direction changes: (1) milestones sized to 1–2 week visible increments; (2) **cost optimization moved to the last step** — refine requirements and harden the pipeline first; (3) agents must be **modular and independently triggerable** (stage commands, not raw prompts); (4) human-in-the-loop concentrated at **acceptance-criteria definition and final check**, everything between on auto; (5) **Windows + Mac support** required (team runs both); (6) full **team demo** in the week of Sep 7. Calendar mapping lives in [07-timeline.md](07-timeline.md).
 
-- Repo initialized; full R&D documentation (charter, SDD evaluation, tooling comparison, model routing, architecture, governance, metrics)
-- Agent team skeleton in `.claude/agents/`; repo conventions in `CLAUDE.md`; spec/task templates
-- Standup infrastructure; GitHub setup guide
-- **Demo:** this repo, reviewable by Hasan
-- **Ask to Hasan:** ~$25–50 OpenRouter credit approved for Week 4 (see [01-research/model-routing-strategy.md](01-research/model-routing-strategy.md) §Costs)
+## Phases 1–3 ✅ (Aug 3 – Sep 2) — R&D, validation, working POC
 
-## Week 2 — POC stage 1: requirement → spec → tasks
+Complete. R&D docs + validation with citations; 7-agent team defined; POC ran end-to-end on a real requirement: agent-written spec → human approval → planner → developer (45 tests) → adversarial review (caught 2 real issues) → CI gates → PRs → human merge. SPEC-001 `Implemented`. Details: [07-timeline.md](07-timeline.md) M1–M3.
 
-- Push repo to GitHub ([setup-github.md](setup-github.md))
-- Scaffold the POC sample app shell (Node/TypeScript REST API — small, testable, CI-friendly)
-- Run `requirements-analyst` and `planner` on 2–3 real sample requirements end-to-end; refine agent prompts against actual output
-- Exercise the human spec-approval gate for real
-- **Demo:** a raw requirement becoming an approved spec and a dependency-ordered task list, hands-off except approval
+## Phase 4 (Sep 1–11) — Modularity & team demo
 
-## Week 3 — POC stage 2: code → tests → PR
+- Modular stage commands so each agent is independently triggerable: `/pipeline-spec <requirement>`, `/pipeline-plan <spec>`, `/pipeline-dev <task>`, `/pipeline-review <branch>`, `/pipeline-status`
+- Refine the requirements set for the next pipeline runs (sponsor ask) — sharper acceptance criteria, performance budgets in specs
+- Demo runbook ([09-demo-runbook.md](09-demo-runbook.md)); **live team demo week of Sep 7**: fresh requirement in, PR out
+- HITL model documented as: humans own acceptance-criteria definition + final check; agent steps auto-advance between those gates
 
-- `developer` agent implements tasks on branches (parallel where independent); `code-reviewer` reviews before push
-- GitHub Actions gate stack live: lint, type-check, tests, coverage threshold, mutation testing (Stryker), security scan — with `PreToolUse` deny-hooks enforcing protected-file rules
-- Security-auditor reviews any input-handling or dependency change from this week (pulled forward from Week 5 — LLM-code vulnerability rates justify it, see [01-research/validation-2026-08.md](01-research/validation-2026-08.md) §Track 6)
-- Bounded retry loop as an automated stage: CI failure feeds back to the developer agent → fix → resubmit (ceiling: 2 attempts, then escalate)
-- **Demo: the full POC — requirement → spec → tasks → code → tests → green PR, human touches only spec approval and merge.** This completes the sponsor's POC deliverable.
+## Phase 5 (Sep 14–25) — Security, performance & QA hardening + repeatability
 
-## Week 4 — Demo, measurement & cost routing
+- security-auditor and qa-engineer join every run; perf budgets enforced as a CI gate; mutation testing on agent tests
+- Second full pipeline run (SPEC-002, due dates) proves repeatability; metrics logged per [05-metrics.md](05-metrics.md)
 
-- Demo the full pipeline to Hasan; collect steering feedback
-- Baseline metrics from Weeks 2–3 runs (cycle time, first-pass gate rate, cost per feature — [05-metrics.md](05-metrics.md))
-- With OpenRouter credit: benchmark DeepSeek V4 Flash / Qwen3-Coder-Next / Kimi K2.7 Code (provider-pinned) on ~10 identical specced tasks vs the Claude baseline; spike **OpenHands** as the budget-executor harness (aider as fallback) — Hermes Agent and OpenClaw were ruled out by the security research, see [01-research/validation-2026-08.md](01-research/validation-2026-08.md) §Track 3
-- Wire budget-model routing for the task types that pass the decision rule (eval gates first, then traffic — never the reverse)
-- **Demo:** cost/quality comparison table with a routing recommendation backed by data
+## Phase 6 (Sep 28 – Oct 9) — Team handoff & cross-platform
 
-## Weeks 5–6 — Hardening & repeatability
+- Operator guide ([08-operator-guide.md](08-operator-guide.md)); 1–2 devs clone, run the pipeline themselves, file feedback
+- **Windows + Mac verified** (hooks/scripts portable); issue-triggered headless runs via GitHub Actions
 
-- `security-auditor` and `qa-engineer` (Playwright MCP) join the pipeline; performance smoke tests (k6/autocannon) with p95-latency budgets become a CI gate
-- Second full POC run on fresh requirements to prove repeatability; tune spec threshold and gate strictness with the data
-- Escalation rules and audit logging exercised end-to-end
-- **Demo:** the pipeline run twice, metrics dashboard of both runs
+## Phase 7 (Oct 12–23) — Cost optimization (deliberately last, sponsor decision)
 
-## Week 7+ — Scale-out (becomes the platform)
+- Benchmark DeepSeek / Qwen / Kimi (provider-pinned via OpenRouter) vs Claude baseline on hardened tasks; OpenHands executor spike (Hermes/OpenClaw ruled out — [01-research/validation-2026-08.md](01-research/validation-2026-08.md) §Track 3)
+- Wire routing for task types that pass the decision rule (eval gates first, then traffic); final metrics report; v1 handover
 
-- Onboard 1–2 devs as pipeline operators; write the operator guide; lead shifts to assigning work
-- Headless orchestration: GitHub Actions-triggered pipeline runs (issue label → pipeline)
-- Deployment agent for a staging environment (human-approved deploys)
-- Monitoring/remediation (`sre` agent) once something is deployed and emitting telemetry
-- Candidate first real project: pick a small internal tool and build it through the pipeline
+## Backlog (post-v1)
+
+- Autonomous variant for vibe-coded apps: no docs → agents derive behavior via exploratory testing, spec retroactively, then pipeline as normal
+- Deployment agent + staging; monitoring/SRE agent once something is deployed
+- First real internal project through the pipeline
 
 ## Standing rules
 
 - Every week ends with a Friday standup posted in the HQ channel
 - Scope pressure resolves by cutting scope, not extending timelines — later weeks' items slip before earlier weeks' quality does
-- Any phase can be re-planned after Week 4's demo; the sponsor steers
+- Sponsor steers at each demo checkpoint
