@@ -1,6 +1,6 @@
 # SPEC-002: Task Due Dates & Overdue Endpoint
 
-**Status:** Draft <!-- Draft | Approved | Implemented | Superseded — only a human sets Approved -->
+**Status:** Approved <!-- Approved by Hasnat Ahmed, 2026-09-04, via pipeline approval gate -->
 **Requirement source:** poc/README.md sample requirements queue, item #2
 **Date:** 2026-09-04
 
