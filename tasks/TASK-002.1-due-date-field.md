@@ -3,7 +3,7 @@
 **Spec:** SPEC-002 (specs/SPEC-002-due-dates-overdue.md)
 **Size:** M
 **Depends on:** none — foundational for this spec; TASK-002.2 depends on this
-**Status:** In review
+**Status:** Done
 **Branch:** task/002.1-due-date-field
 
 ## Intent

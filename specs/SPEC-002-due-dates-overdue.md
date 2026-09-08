@@ -1,6 +1,6 @@
 # SPEC-002: Task Due Dates & Overdue Endpoint
 
-**Status:** Approved <!-- Approved by Hasnat Ahmed, 2026-09-04, via pipeline approval gate -->
+**Status:** Implemented <!-- Implemented 2026-09-08: PRs #5-#6 merged to main by lead -->
 **Requirement source:** poc/README.md sample requirements queue, item #2
 **Date:** 2026-09-04
 

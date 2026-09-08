@@ -3,7 +3,7 @@
 **Spec:** SPEC-002 (specs/SPEC-002-due-dates-overdue.md)
 **Size:** M
 **Depends on:** TASK-002.1 (dueDate field on Task model/store/validation/routes)
-**Status:** In review
+**Status:** Done
 **Branch:** task/002.2-overdue-endpoint (stacked on task/002.1-due-date-field)
 
 ## Intent
