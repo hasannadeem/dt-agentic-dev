@@ -22,6 +22,20 @@ describe('TaskStore', () => {
 
       expect(first.id).not.toBe(second.id);
     });
+
+    it('defaults dueDate to null when omitted', () => {
+      const store = new TaskStore();
+      const task = store.create('Buy milk');
+
+      expect(task.dueDate).toBeNull();
+    });
+
+    it('stores a given dueDate verbatim', () => {
+      const store = new TaskStore();
+      const task = store.create('Pay rent', '2026-09-10T00:00:00.000Z');
+
+      expect(task.dueDate).toBe('2026-09-10T00:00:00.000Z');
+    });
   });
 
   describe('list', () => {
@@ -73,6 +87,44 @@ describe('TaskStore', () => {
     it('returns undefined for an unknown id', () => {
       const store = new TaskStore();
       expect(store.complete('unknown-id')).toBeUndefined();
+    });
+
+    it('leaves dueDate unchanged when completing a task', () => {
+      const store = new TaskStore();
+      const created = store.create('Pay rent', '2026-09-10T00:00:00.000Z');
+
+      const completed = store.complete(created.id);
+
+      expect(completed?.dueDate).toBe('2026-09-10T00:00:00.000Z');
+    });
+  });
+
+  describe('listOverdue', () => {
+    it('excludes a task whose dueDate is exactly equal to `now` (not overdue yet), and includes it one millisecond later (pins the < operator)', () => {
+      const store = new TaskStore();
+      const exactEpoch = Date.parse('2020-01-01T00:00:00.000Z');
+      const task = store.create('Due right at now', '2020-01-01T00:00:00.000Z');
+
+      expect(store.listOverdue(exactEpoch)).toEqual([]);
+      expect(store.listOverdue(exactEpoch + 1)).toEqual([task]);
+    });
+
+    it('orders tasks with an identical dueDate by createdAt ascending, even when createdAt order is inverted relative to insertion order (pins the tiebreak, kills return-0 mutation)', () => {
+      const store = new TaskStore();
+      const insertedFirst = store.create('Inserted first', '2020-01-01T00:00:00.000Z');
+      const insertedSecond = store.create('Inserted second', '2020-01-01T00:00:00.000Z');
+
+      // TaskStore hands out live references, so mutating the returned
+      // objects mutates the stored tasks directly. Force createdAt order to
+      // invert insertion order, so a comparator that (incorrectly) falls
+      // back to insertion/stable order instead of comparing createdAt would
+      // be caught here.
+      insertedFirst.createdAt = '2020-01-02T00:00:00.000Z';
+      insertedSecond.createdAt = '2020-01-01T00:00:00.000Z';
+
+      const result = store.listOverdue(Date.parse('2021-01-01T00:00:00.000Z'));
+
+      expect(result.map((t) => t.id)).toEqual([insertedSecond.id, insertedFirst.id]);
     });
   });
 

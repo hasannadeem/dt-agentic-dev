@@ -3,7 +3,7 @@
 **Spec:** SPEC-002 (specs/SPEC-002-due-dates-overdue.md)
 **Size:** M
 **Depends on:** none — foundational for this spec; TASK-002.2 depends on this
-**Status:** Todo
+**Status:** In review
 **Branch:** task/002.1-due-date-field
 
 ## Intent
@@ -38,3 +38,4 @@ Add an optional `dueDate` field to the `Task` model, store, and validation layer
 
 - Per the spec's open questions, `dueDate` is create-time only in this spec (no `PATCH`/edit endpoint) — do not add one.
 - `GET /tasks/overdue` is intentionally not touched by this task; it is TASK-002.2, which depends on the `dueDate` field landing here first.
+- **Spec deviation (post-review, resolved in this branch):** the first review round of this task found that the spec's original `dueDate` format assumption ("ISO 8601 UTC timestamp... whatever `Date` parsing supports") was underspecified — native `Date` parsing accepts bare dates, timezone-less timestamps, numeric UTC offsets, and even locale strings (e.g. `"March 5, 2026"`), none of which should be a valid `dueDate`. Per reviewer direction, `src/validation/dueDate.ts` was tightened to a strict grammar (`YYYY-MM-DDTHH:mm:ss[.SSS]Z`, explicit `Z` required, milliseconds optional, plus a real-calendar-date check that rejects rollovers like `2026-02-30`), and `specs/SPEC-002-due-dates-overdue.md`'s "What format is `dueDate`?" and "malformed `dueDate`" assumptions were amended in the same branch to pin this grammar, so spec and code do not diverge. The review also confirmed explicit JSON `null` for `dueDate` is intended to behave identically to omission (documented in the spec's "Is `dueDate` required on create?" assumption).
