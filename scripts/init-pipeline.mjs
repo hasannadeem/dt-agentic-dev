@@ -41,6 +41,52 @@ if (target === SOURCE) {
  * and the first match is the one the tests live under.
  */
 const TOOLCHAINS = [
+  // Android must be detected before generic Gradle/Node: an Android repo has a
+  // build.gradle too, and many have a package.json for tooling.
+  {
+    id: 'android', marker: 'settings.gradle.kts', language: 'android (gradle)',
+    install: './gradlew --no-daemon help', tier: 'virtual',
+    // `lint` alone checks only the DEFAULT variant — naming the variant is not
+    // optional. Lint is also not part of `build`, so it must be named too.
+    gates: () => './gradlew --no-daemon lintDebug testDebugUnitTest',
+  },
+  {
+    id: 'android', marker: 'settings.gradle', language: 'android (gradle)',
+    install: './gradlew --no-daemon help', tier: 'virtual',
+    gates: () => './gradlew --no-daemon lintDebug testDebugUnitTest',
+  },
+  {
+    id: 'apple', marker: 'Package.swift', language: 'swift package',
+    install: 'swift package resolve', tier: 'host',
+    gates: () => 'swift build && swift test',
+  },
+  {
+    id: 'flutter', marker: 'pubspec.yaml', language: 'flutter/dart', tier: 'host',
+    install: 'flutter pub get',
+    gates: () => 'dart format --output=none --set-exit-if-changed . && flutter analyze --fatal-infos && flutter test',
+  },
+  {
+    id: 'dotnet', marker: 'global.json', language: '.net', install: 'dotnet restore', tier: 'host',
+    // `dotnet test` builds by default; --no-build needs a matching prior build.
+    gates: () => 'dotnet format --verify-no-changes && dotnet build -c Release && dotnet test -c Release --no-build',
+  },
+  {
+    id: 'maven', marker: 'pom.xml', language: 'java (maven)', install: 'mvn -B -ntp dependency:go-offline', tier: 'host',
+    // `verify`, not `test`: `test` skips integration tests and packaging.
+    gates: () => 'mvn -B -ntp verify',
+  },
+  {
+    id: 'elixir', marker: 'mix.exs', language: 'elixir', install: 'mix deps.get', tier: 'host',
+    gates: () => 'mix compile --warnings-as-errors && mix format --check-formatted && mix test',
+  },
+  {
+    id: 'php', marker: 'composer.json', language: 'php', install: 'composer install --no-interaction --prefer-dist', tier: 'host',
+    gates: () => 'vendor/bin/phpunit',
+  },
+  {
+    id: 'cpp', marker: 'CMakeLists.txt', language: 'c/c++', install: 'cmake -B build -DCMAKE_BUILD_TYPE=Debug', tier: 'host',
+    gates: () => 'cmake --build build && ctest --test-dir build --output-on-failure',
+  },
   {
     id: 'node', marker: 'package.json', language: 'javascript/typescript',
     install: 'npm ci',
@@ -55,11 +101,11 @@ const TOOLCHAINS = [
       return parts.length ? parts.join(' && ') : null;
     },
   },
-  { id: 'python', marker: 'pyproject.toml', language: 'python', install: 'pip install -e ".[dev]"', gates: () => 'ruff check . && mypy . && pytest' },
-  { id: 'python', marker: 'requirements.txt', language: 'python', install: 'pip install -r requirements.txt', gates: () => 'ruff check . && pytest' },
-  { id: 'go', marker: 'go.mod', language: 'go', install: 'go mod download', gates: () => 'go vet ./... && go test ./...' },
-  { id: 'rust', marker: 'Cargo.toml', language: 'rust', install: 'cargo fetch', gates: () => 'cargo clippy -- -D warnings && cargo test' },
-  { id: 'ruby', marker: 'Gemfile', language: 'ruby', install: 'bundle install', gates: () => 'bundle exec rubocop && bundle exec rspec' },
+  { id: 'python', marker: 'pyproject.toml', language: 'python', install: 'pip install -e ".[dev]"', gates: () => 'ruff check . && ruff format --check . && pytest -q', tier: 'host' },
+  { id: 'python', marker: 'requirements.txt', language: 'python', install: 'pip install -r requirements.txt', gates: () => 'ruff check . && pytest -q', tier: 'host' },
+  { id: 'go', marker: 'go.mod', language: 'go', install: 'go mod download', gates: () => 'go build ./... && go vet ./... && go test -race ./...', tier: 'host' },
+  { id: 'rust', marker: 'Cargo.toml', language: 'rust', install: 'cargo fetch', gates: () => 'cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --all-features', tier: 'host' },
+  { id: 'ruby', marker: 'Gemfile', language: 'ruby', install: 'bundle install', gates: () => 'bundle exec rubocop && bundle exec rspec', tier: 'host' },
 ];
 
 /** Finds the shallowest directory containing a known toolchain marker. */
@@ -93,9 +139,27 @@ const PAYLOAD = [
   '.claude/settings.json',
   'CLAUDE.md',
   'scripts/validate-artifacts.mjs',
+  'scripts/ci-config.mjs',
+  'scripts/doctor.mjs',
+  'templates/ci.yml.template',
+  'docs/11-capability-tiers.md',
   'specs/spec-template.md',
   'tasks/task-template.md',
 ];
+
+/** Extra runner setup a toolchain needs before its install command works. */
+const SETUP_STEPS = {
+  python: "      - uses: actions/setup-python@v5\n        with:\n          python-version: '3.12'",
+  go: '      - uses: actions/setup-go@v5\n        with:\n          go-version: stable',
+  rust: '      - uses: dtolnay/rust-toolchain@stable',
+  ruby: "      - uses: ruby/setup-ruby@v1\n        with:\n          ruby-version: '3.3'\n          bundler-cache: true",
+  maven: "      - uses: actions/setup-java@v4\n        with:\n          distribution: temurin\n          java-version: '21'\n          cache: maven",
+  android: "      - uses: actions/setup-java@v4\n        with:\n          distribution: temurin\n          java-version: '17'\n          cache: gradle",
+  dotnet: '      - uses: actions/setup-dotnet@v4',
+  flutter: '      - uses: subosito/flutter-action@v2\n        with:\n          channel: stable',
+  php: '      - uses: shivammathur/setup-php@v2\n        with:\n          php-version: \'8.3\'',
+  elixir: "      - uses: erlef/setup-beam@v1\n        with:\n          otp-version: '27'\n          elixir-version: '1.17'",
+};
 
 const copied = [];
 const skipped = [];
@@ -130,13 +194,40 @@ const config = {
     description: 'lint, type-check, and the full test suite',
   },
   artifacts: { specs: 'specs', tasks: 'tasks' },
+  // Which tier of verification this project's gate command can reach. Anything
+  // above "host" means CI cannot prove the feature works — see
+  // docs/11-capability-tiers.md. Specs for such projects must declare what a
+  // human has to check on real hardware.
+  verification: { tier: detected?.tier ?? 'host' },
   guard: {
     secretPaths: ['.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', 'id_rsa*'],
     platformPaths: ['.claude/*', '.claude/**/*', '.github/workflows/*'],
   },
 };
 
+const gatesUsable = Boolean(config.gates.command);
+
 for (const rel of PAYLOAD) copyPath(rel);
+
+// A CI workflow is not optional. The pipeline's quality model is "deterministic
+// gates decide what is acceptable" — without CI the gates only run wherever an
+// agent happens to run them, which is exactly the assurance we are trying not
+// to rely on.
+const workflowPath = join(target, '.github/workflows/ci.yml');
+let workflowNote;
+if (existsSync(workflowPath)) {
+  workflowNote = 'kept your existing .github/workflows/ci.yml — add the two platform steps by hand';
+} else if (!gatesUsable) {
+  workflowNote = 'skipped — no gate command to run (see the warning above)';
+} else {
+  const template = readFileSync(join(SOURCE, 'templates/ci.yml.template'), 'utf8');
+  const body = template.replace('{{SETUP_STEPS}}', SETUP_STEPS[detected?.id] ?? '');
+  if (!dryRun) {
+    mkdirSync(dirname(workflowPath), { recursive: true });
+    writeFileSync(workflowPath, body);
+  }
+  workflowNote = 'wrote .github/workflows/ci.yml';
+}
 
 const configPath = join(target, 'pipeline.config.json');
 const configExists = existsSync(configPath);
@@ -145,13 +236,20 @@ if (!configExists && !dryRun) {
 }
 
 console.log(`\nInstalling the agentic pipeline into ${target}${dryRun ? ' (dry run)' : ''}\n`);
-const gatesUsable = Boolean(config.gates.command);
 if (detected && gatesUsable) {
   console.log(`  Detected ${detected.language} in "${appDir}" — gates: ${config.gates.command}`);
 } else if (detected) {
   console.log(`  Detected ${detected.language} in "${appDir}", but found no usable gate command.`);
 } else {
   console.log('  No known toolchain detected. Set app.dir and gates.command in pipeline.config.json by hand.');
+}
+
+if (config.verification.tier !== 'host') {
+  console.log(`
+  NOTE: detected a ${config.verification.tier}-tier project. Its gate command runs
+  host-side checks only. Emulator, device and hardware behaviour cannot be
+  proven by CI — specs must declare what a human verifies on real hardware.
+  See docs/11-capability-tiers.md (copied into your project).`);
 }
 
 if (!gatesUsable) {
@@ -180,15 +278,19 @@ if (skipped.length) {
   console.log(`  Skipped ${skipped.length} existing file(s) — review these yourself:`);
   for (const s of skipped) console.log(`            ${s}`);
 }
-console.log(configExists ? '  Kept    existing pipeline.config.json' : `  Wrote   pipeline.config.json`);
+console.log(configExists ? '  Kept    existing pipeline.config.json' : '  Wrote   pipeline.config.json');
+console.log(`  CI      ${workflowNote}`);
 
 console.log(`
 Next steps:
-  1. Check pipeline.config.json — especially gates.command; it must pass on a clean checkout.
-  2. Run it: cd ${relative(process.cwd(), join(target, appDir)) || '.'} && ${config.gates.command || '<your gate command>'}
-  3. Enable branch protection on main (PRs required) — the guard blocks pushes to main,
+  1. Verify the install:  node scripts/doctor.mjs
+     It checks every control the pipeline assumes it has, and tells you what to
+     do about anything missing.
+  2. Check pipeline.config.json — especially gates.command; it must pass on a clean checkout.
+  3. Run it: cd ${relative(process.cwd(), join(target, appDir)) || '.'} && ${config.gates.command || '<your gate command>'}
+  4. Enable branch protection on main (PRs required) — the guard blocks pushes to main,
      but only GitHub can enforce it for humans and other tools.
-  4. Open the project in Claude Code and run /pipeline-spec "<your first requirement>".
+  5. Open the project in Claude Code and run /pipeline-spec "<your first requirement>".
 
 Read docs/08-operator-guide.md in this repository for how the stages work.
 `);
