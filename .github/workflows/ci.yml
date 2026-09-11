@@ -28,6 +28,12 @@ jobs:
   secrets:
     name: secret scanning
     runs-on: ubuntu-latest
+    # gitleaks-action reports findings back onto the PR, so it needs write
+    # access there. Without it the job fails with "Resource not accessible by
+    # integration" — a permissions error that looks like a scan failure.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -64,9 +70,16 @@ jobs:
           if git diff --name-only "$BASE" "$HEAD" | grep -qE 'package\.json|requirements.*\.txt|go\.mod|Cargo\.toml|Gemfile'; then
             echo "::warning::Dependency manifest changed — a human must confirm every added package name is real before merge."
           fi
+      # Threshold is deliberate: `high` and above blocks, moderate is reported.
+      # A gate that fails on every transitive moderate gets disabled within a
+      # week, and then nothing is checked at all.
       - name: Audit dependencies
         working-directory: ${{ steps.cfg.outputs.dir }}
         run: npm audit --audit-level=high
+      - name: Report lower-severity advisories
+        if: always()
+        working-directory: ${{ steps.cfg.outputs.dir }}
+        run: npm audit || true
 
   app:
     name: application gates
