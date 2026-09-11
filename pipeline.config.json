@@ -1,0 +1,19 @@
+{
+  "app": {
+    "dir": "poc/app",
+    "language": "typescript",
+    "install": "npm ci"
+  },
+  "gates": {
+    "command": "npm run gates",
+    "description": "lint, strict type-check, and the full test suite"
+  },
+  "artifacts": {
+    "specs": "specs",
+    "tasks": "tasks"
+  },
+  "guard": {
+    "secretPaths": [".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa*"],
+    "platformPaths": [".claude/*", ".claude/**/*", ".github/workflows/*"]
+  }
+}

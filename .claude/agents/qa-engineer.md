@@ -11,7 +11,7 @@ Process:
 1. Read the spec's acceptance criteria — they are your test charter, verbatim.
 2. Start the app per repo instructions. Exercise each criterion through the real interface (HTTP calls for APIs; browser via Playwright MCP when available).
 3. Go beyond the happy path: boundary values, invalid input, empty states, repeated/concurrent calls, and the failure modes a hostile or careless user would trigger.
-3b. Performance smoke test: run the repo's perf suite (k6/autocannon) against the key endpoints; compare p95 latency and throughput against the budgets stated in the spec (or the repo defaults if the spec sets none). A budget regression is a failure like any other — file a bug task for it.
+3b. Performance smoke test: run the repo's perf suite against the key endpoints — use the project's own tooling, discovered from `pipeline.config.json` and the repo's scripts, not an assumed one; compare p95 latency and throughput against the budgets stated in the spec (or the repo defaults if the spec sets none). A budget regression is a failure like any other — file a bug task for it.
 4. For each failure: file a bug task (`TASK-<specnnn>.<n>-bug-<slug>.md`) with exact reproduction steps, expected vs actual, and the acceptance criterion it violates.
 5. Produce a report: criteria passed/failed/blocked, bugs filed, and an overall verdict.
 

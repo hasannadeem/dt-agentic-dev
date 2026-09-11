@@ -6,19 +6,46 @@ on:
     branches: [main]
 
 jobs:
-  gates:
+  platform:
+    name: platform conventions
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: poc/app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # Our docs claim "traceability by construction"; these two steps are what
+      # make that mechanical rather than honour-system.
+      - name: Validate spec/task artifacts
+        run: node scripts/validate-artifacts.mjs
+      - name: Governance guard scenarios
+        run: python3 .claude/hooks/guard_test.py
+
+  app:
+    name: application gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Project layout and gate command come from pipeline.config.json, so this
+      # workflow ports to another project without edits.
+      - name: Read pipeline config
+        id: cfg
+        run: |
+          node -e "
+            const c = require('./pipeline.config.json');
+            const out = process.env.GITHUB_OUTPUT;
+            require('fs').appendFileSync(out, 'dir=' + (c.app?.dir ?? '.') + '\n');
+            require('fs').appendFileSync(out, 'install=' + (c.app?.install ?? '') + '\n');
+            require('fs').appendFileSync(out, 'gates=' + (c.gates?.command ?? '') + '\n');
+          "
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
           cache: npm
-          cache-dependency-path: poc/app/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
+          cache-dependency-path: ${{ steps.cfg.outputs.dir }}/package-lock.json
+      - name: Install dependencies
+        working-directory: ${{ steps.cfg.outputs.dir }}
+        run: ${{ steps.cfg.outputs.install }}
+      - name: Run gates
+        working-directory: ${{ steps.cfg.outputs.dir }}
+        run: ${{ steps.cfg.outputs.gates }}

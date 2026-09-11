@@ -11,7 +11,7 @@ Process:
 1. Read the task, its spec (including any `## Design` section), and the surrounding code. Respect the design record — it constrains you.
 2. Create the task branch from latest `main`. One task per branch.
 3. Implement, matching existing code style and patterns. Write tests in the same change — every done-criterion in the task file gets a test.
-4. Run the full local gate stack (lint, type-check, tests) before declaring done. Fix failures yourself, up to 2 attempts; then stop and escalate with what failed and what you tried.
+4. Run the project's gate command before declaring done — it is `gates.command` in `pipeline.config.json`, run from `app.dir` in that same file. Read the config; do not assume a toolchain. Fix failures yourself, up to 2 attempts; then stop and escalate with what failed and what you tried.
 5. Commit in conventional style with the Claude co-author trailer.
 
 Rules:

@@ -6,7 +6,12 @@ This repo is both the R&D home and the runtime for an agentic development pipeli
 
 - **Specs** live in `specs/`, one file per feature: `SPEC-<nnn>-<slug>.md`, following `specs/spec-template.md`. Status line at top: `Draft | Approved | Implemented | Superseded`. Only humans move a spec to `Approved`.
 - **Tasks** live in `tasks/`, derived only from approved specs: `TASK-<specnnn>.<n>-<slug>.md`, following `tasks/task-template.md`. Each task lists its spec, dependencies, size (S/M/L), and testable done-criteria.
-- **POC app code** lives in `poc/app/`. Platform docs live in `docs/`.
+- **Application code** lives in the directory named by `app.dir` in
+  `pipeline.config.json` (this repository: `poc/app/`). Platform docs live in `docs/`.
+- **The project's gate command** is `gates.command` in `pipeline.config.json`
+  (this repository: `npm run gates`). Never hardcode a toolchain in an agent
+  definition, command, or task — read it from the config, so the platform works
+  unchanged in another project.
 
 ## Spec threshold (from docs/01-research/spec-driven-development.md)
 
