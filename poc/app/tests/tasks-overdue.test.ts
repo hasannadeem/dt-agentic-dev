@@ -1,29 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import baseRequest from 'supertest';
-import type { Express } from 'express';
+import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { TaskStore } from '../src/store/taskStore.js';
-import { bindTestServer } from './support/server.js';
-import type { TestServer } from './support/server.js';
+import { setupTestServer } from './support/server.js';
 
-// One server is bound for this whole file (see tests/support/server.ts) and
-// reused for every request; `request(app)` below is a local wrapper that
-// repoints it at the given app, preserving each test's own fresh app/store
-// without opening a new ephemeral-port server per call.
-let testServer: TestServer;
-
-beforeAll(async () => {
-  testServer = await bindTestServer();
-});
-
-afterAll(async () => {
-  await testServer.close();
-});
-
-function request(app: Express): ReturnType<typeof baseRequest> {
-  testServer.use(app);
-  return baseRequest(testServer.server);
-}
+// One server is bound for this whole file and reused for every request; see
+// tests/support/server.ts for what request(app) does and its constraints.
+const request = setupTestServer();
 
 // Fixed, deterministic ISO 8601 UTC strings — always in the past/future
 // relative to any real wall-clock time this suite will ever run at, so
@@ -307,8 +289,7 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
     // would also return 200, and a status-only assertion in the timed loop
     // below would pass without ever exercising the seeded data. Half of
     // seedCount is overdue (even i); the rest are future-dated.
-    testServer.use(app);
-    const seedCheck = await baseRequest(testServer.server).get('/tasks/overdue');
+    const seedCheck = await request(app).get('/tasks/overdue');
     expect(seedCheck.status).toBe(200);
     expect(seedCheck.body).toHaveLength(seedCount / 2);
 
@@ -316,7 +297,7 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
     const overdueDurations: number[] = [];
     for (let i = 0; i < requestCount; i += 1) {
       const start = performance.now();
-      const res = await baseRequest(testServer.server).get('/tasks/overdue');
+      const res = await request(app).get('/tasks/overdue');
       overdueDurations.push(performance.now() - start);
       expect(res.status).toBe(200);
     }

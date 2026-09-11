@@ -1,29 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import baseRequest from 'supertest';
-import type { Express } from 'express';
+import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { TaskStore } from '../src/store/taskStore.js';
-import { bindTestServer } from './support/server.js';
-import type { TestServer } from './support/server.js';
+import { setupTestServer } from './support/server.js';
 
-// One server is bound for this whole file (see tests/support/server.ts) and
-// reused for every request; `request(app)` below is a local wrapper that
-// repoints it at the given app, preserving each test's own fresh app/store
-// without opening a new ephemeral-port server per call.
-let testServer: TestServer;
-
-beforeAll(async () => {
-  testServer = await bindTestServer();
-});
-
-afterAll(async () => {
-  await testServer.close();
-});
-
-function request(app: Express): ReturnType<typeof baseRequest> {
-  testServer.use(app);
-  return baseRequest(testServer.server);
-}
+// One server is bound for this whole file and reused for every request; see
+// tests/support/server.ts for what request(app) does and its constraints.
+const request = setupTestServer();
 
 async function createTask(app: ReturnType<typeof createApp>, title: string, dueDate?: string) {
   const res = await request(app)
@@ -179,10 +161,9 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
     const app = createApp(seedStore);
 
     const completeDurations: number[] = [];
-    testServer.use(app);
     for (const id of ids) {
       const start = performance.now();
-      const res = await baseRequest(testServer.server).post(`/tasks/${id}/complete`);
+      const res = await request(app).post(`/tasks/${id}/complete`);
       completeDurations.push(performance.now() - start);
       expect(res.status).toBe(200);
     }
@@ -203,10 +184,9 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
     const app = createApp(seedStore);
 
     const deleteDurations: number[] = [];
-    testServer.use(app);
     for (const id of ids) {
       const start = performance.now();
-      const res = await baseRequest(testServer.server).delete(`/tasks/${id}`);
+      const res = await request(app).delete(`/tasks/${id}`);
       deleteDurations.push(performance.now() - start);
       expect(res.status).toBe(204);
     }

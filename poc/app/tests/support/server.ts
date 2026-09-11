@@ -1,54 +1,49 @@
 import type { Express } from 'express';
 import { createServer } from 'node:http';
 import type { Server } from 'node:http';
+import { afterAll, beforeAll } from 'vitest';
+import supertestRequest from 'supertest';
 
 /**
- * A single ephemeral-port server, bound once (typically in a file's
- * `beforeAll`) and reused for every request issued from that file, closed
- * once (in `afterAll`).
+ * A single ephemeral-port server, bound once and reused for every request
+ * issued from it, closed once when its owner is done with it.
  */
-export interface TestServer {
-  /** The listening server. Pass to supertest's `request(...)`. */
+interface TestServer {
   readonly server: Server;
   /**
    * Points the already-listening server at `app` for every request from
-   * here on, without opening a new port. Call at the start of any test
-   * that needs its own fresh app/store — this swaps the in-process request
-   * handler on the existing socket, so no new port is ever bound.
+   * here on, without opening a new port. This swaps the in-process request
+   * handler on the existing socket — see the constraints on
+   * `setupTestServer` below for what that does and doesn't make safe.
    */
   use(app: Express): void;
-  /** Stops listening. Call once, after every test in the file has run. */
+  /** Stops listening. */
   close(): Promise<void>;
 }
 
-/**
- * Binds one server for reuse across an entire test file, via a
- * `beforeAll`/`afterAll` pair:
- *
- *   let testServer: TestServer;
- *   beforeAll(async () => { testServer = await bindTestServer(); });
- *   afterAll(async () => { await testServer.close(); });
- *
- * `request(app)` (supertest) starts a fresh ephemeral-port server for
- * every call. A suite that does this dozens/hundreds of times
- * intermittently lands on a port another local process is using, and the
- * response then comes from that process rather than the app under test —
- * observed as an impossible status (a 404 from a valid POST, a 401 from an
- * app with no auth routes). Binding once per file and reusing it (via
- * `use()` to repoint at a fresh app/store wherever a test needs isolation)
- * removes the race entirely; every request still traverses real HTTP.
- *
- * Scope (accurate as of TASK-000.3): every `request()` call site under
- * `tests/` — perf loops and single-shot functional assertions alike —
- * goes through a server bound this way. None binds a fresh ephemeral-port
- * server per call, and no test file binds more than one server.
- */
-export async function bindTestServer(): Promise<TestServer> {
+async function bindTestServer(): Promise<TestServer> {
   const server = createServer();
+
   await new Promise<void>((resolve, reject) => {
-    server.once('listening', resolve);
-    server.once('error', reject);
+    function onBindError(err: Error): void {
+      reject(err);
+    }
+    server.once('error', onBindError);
+    server.once('listening', () => {
+      server.off('error', onBindError);
+      resolve();
+    });
     server.listen(0);
+  });
+
+  // A listening server with zero 'error' listeners crashes the process if
+  // one ever fires (Node re-throws unhandled 'error' events on an
+  // EventEmitter) — keep exactly one attached for as long as the server
+  // itself lives, rather than just the bind-time listener above, which is
+  // removed once 'listening' fires so it can't later reject an
+  // already-settled promise.
+  server.on('error', (err) => {
+    console.error('tests/support/server.ts: server error after startup', err);
   });
 
   return {
@@ -58,5 +53,63 @@ export async function bindTestServer(): Promise<TestServer> {
       server.on('request', app);
     },
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
+/**
+ * Binds one server for an entire test file and returns a drop-in
+ * `request(app)` function to use in place of supertest's own `request`
+ * throughout that file. Registers the bind/close as `beforeAll`/`afterAll`
+ * hooks itself:
+ *
+ *   const request = setupTestServer();
+ *   ...
+ *   const res = await request(createApp()).get('/tasks');
+ *
+ * Why: supertest's `request(app)` starts a fresh ephemeral-port server for
+ * every call. A suite that does this dozens/hundreds of times
+ * intermittently lands on a port another local process is using, and the
+ * response then comes from that process rather than the app under test —
+ * observed as an impossible status (a 404 from a valid POST, a 401 from an
+ * app with no auth routes). The function returned here instead repoints
+ * one already-listening server at `app` (swapping its `'request'`
+ * listener, not opening a new port) before issuing the request through it,
+ * so a file binds and closes exactly one server no matter how many
+ * apps/stores its tests use for isolation.
+ *
+ * Constraints — every call site in this suite already fits this (a plain
+ * sequential `await request(app)...` chain), but the wrapper is NOT a
+ * drop-in replacement for concurrent or deferred use, and breaks silently
+ * rather than erroring if that changes:
+ * - Issue and await one request at a time. `request(app)` repoints the
+ *   shared server *synchronously*, the instant it's called — it does not
+ *   scope `app` to the one request being built. Two calls made before
+ *   either is awaited race on the same server and both resolve against
+ *   whichever app was passed to the *last* call, regardless of which each
+ *   was built from — confirmed with a probe:
+ *     `await Promise.all([request(a).get('/x'), request(b).get('/x')])`
+ *     resolves both against `b`.
+ * - A request built from an earlier `request(app)` call but sent/awaited
+ *   after a later `request(otherApp)` call is answered by `otherApp`, not
+ *   `app` — e.g. `const p = request(a).get('/x'); request(b); await p;`
+ *   resolves `p` against `b`.
+ * - A request sent before `request(app)` has been called even once in the
+ *   file hangs until the test timeout instead of erroring: the server is
+ *   created with no `'request'` listener attached until the first `use()`.
+ */
+export function setupTestServer(): (app: Express) => ReturnType<typeof supertestRequest> {
+  let testServer: TestServer;
+
+  beforeAll(async () => {
+    testServer = await bindTestServer();
+  });
+
+  afterAll(async () => {
+    await testServer.close();
+  });
+
+  return (app: Express): ReturnType<typeof supertestRequest> => {
+    testServer.use(app);
+    return supertestRequest(testServer.server);
   };
 }
