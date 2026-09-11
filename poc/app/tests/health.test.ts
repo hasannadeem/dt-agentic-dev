@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import request from 'supertest';
 import { createApp } from '../src/app.js';
+import { setupTestServer } from './support/server.js';
+
+// One server is bound for this whole file and reused for every request; see
+// tests/support/server.ts for what request(app) does and its constraints.
+const request = setupTestServer();
 
 describe('GET /health', () => {
   it('returns ok', async () => {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { TaskStore } from '../src/store/taskStore.js';
-import { withServer } from './support/server.js';
+import { setupTestServer } from './support/server.js';
+
+// One server is bound for this whole file and reused for every request; see
+// tests/support/server.ts for what request(app) does and its constraints.
+const request = setupTestServer();
 
 async function createTask(app: ReturnType<typeof createApp>, title: string, dueDate?: string) {
   const res = await request(app)
@@ -158,14 +161,12 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
     const app = createApp(seedStore);
 
     const completeDurations: number[] = [];
-    await withServer(app, async (server) => {
-      for (const id of ids) {
-        const start = performance.now();
-        const res = await request(server).post(`/tasks/${id}/complete`);
-        completeDurations.push(performance.now() - start);
-        expect(res.status).toBe(200);
-      }
-    });
+    for (const id of ids) {
+      const start = performance.now();
+      const res = await request(app).post(`/tasks/${id}/complete`);
+      completeDurations.push(performance.now() - start);
+      expect(res.status).toBe(200);
+    }
 
     expect(p95(completeDurations)).toBeLessThan(100);
   });
@@ -183,14 +184,12 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
     const app = createApp(seedStore);
 
     const deleteDurations: number[] = [];
-    await withServer(app, async (server) => {
-      for (const id of ids) {
-        const start = performance.now();
-        const res = await request(server).delete(`/tasks/${id}`);
-        deleteDurations.push(performance.now() - start);
-        expect(res.status).toBe(204);
-      }
-    });
+    for (const id of ids) {
+      const start = performance.now();
+      const res = await request(app).delete(`/tasks/${id}`);
+      deleteDurations.push(performance.now() - start);
+      expect(res.status).toBe(204);
+    }
 
     expect(p95(deleteDurations)).toBeLessThan(100);
   });
