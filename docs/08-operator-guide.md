@@ -2,6 +2,29 @@
 
 For developers cloning this repo to try the pipeline. You operate the gates; the agents do the work.
 
+## Two ways to use this
+
+**A. Try the pipeline on this repo's sample app** — follow *Prerequisites* and *Setup* below.
+
+**B. Install the pipeline into your own project** — one command, any language:
+
+```sh
+node scripts/init-pipeline.mjs /path/to/your/project
+```
+
+It detects your toolchain (Node, Python, Go, Rust, Ruby), copies the agent team,
+stage commands, governance guard, conventions and templates into your repo, and
+writes a `pipeline.config.json` describing your layout and gate command. Existing
+files are never overwritten, so re-running is safe — add `--dry-run` to preview.
+
+Then check the generated config (especially `gates.command` — it must pass on a
+clean checkout), enable branch protection on `main`, and run
+`/pipeline-spec "<your first requirement>"`.
+
+**Nothing in the platform is specific to this repository.** Agents read the app
+directory and gate command from `pipeline.config.json`; hardcoding a toolchain
+in an agent, command, or task is a convention violation.
+
 ## Prerequisites
 
 - **Claude Code** installed and logged in (CLI or VS Code extension) — macOS and Windows both work; on Windows, run inside **Git Bash or WSL** (the guardrail hooks use `python3` and shell scripts; native PowerShell is not yet verified — flag issues in feedback)
@@ -54,8 +77,8 @@ Stated plainly, because you will hit these:
 
 - **Windows is a supported target, not a verified one.** Nobody has run this pipeline on Windows yet. The guardrail hook shells out to `python3` and the helper scripts assume a POSIX shell, so Git Bash or WSL is required and native PowerShell is untested. If you are our first Windows operator, expect friction and file it.
 - **Test-suite flake is reduced, not eliminated.** Perf loops now bind one server each, but ~70 single-shot `request(app)` sites still bind a fresh ephemeral port per call, which can collide with other local processes and return a response from the wrong server (an impossible status like `404` from a valid `POST`). Tracked as `tasks/TASK-000.3-suite-wide-server-reuse.md`. A re-run usually passes; that is the signature.
-- **The artifact validator does not run in CI yet.** `scripts/validate-artifacts.mjs` works, but nothing invokes it automatically, so convention violations are only caught if you run it. Tracked as done-criterion 6 of `tasks/TASK-000.2-artifact-validator.md`.
-- **The governance guard is weaker than the docs imply.** The shipped `.claude/settings.json` hook matches only `Edit|Write`. Agents that hold `Bash` — developer, qa-engineer, code-reviewer, security-auditor — can still reach protected paths through shell redirection. A hardened replacement exists and is pending install; until then, treat the rails as advisory for Bash-capable agents.
+- **The guard inspects command text, not intent.** It blanks quoted strings and heredoc bodies before matching, so a commit message mentioning a forbidden command is fine — but a sufficiently creative shell construction (`eval`, base64, unusual redirection) could still slip past. It defends against agent mistakes, not a determined adversary. Server-side branch protection is the backstop; enable it.
+- **Non-Node toolchains are generated, not proven.** The installer emits sensible gate commands for Python, Go, Rust and Ruby (`ruff && mypy && pytest`, `go vet && go test`, and so on), but no project in those languages has yet run a full pipeline cycle. Expect to adjust `gates.command`.
 - **Governance failures have happened and were not caught by automation.** In one day: an agent committed to `main`, the orchestrator pushed it, and the orchestrator later committed code to `main` directly. Tests passed and CI was green through all three. What caught them was an agent comparing commit *contents* against commit *claims*. Do not assume green CI means the process was followed.
 
 ## Known sharp edges
