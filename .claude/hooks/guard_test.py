@@ -6,12 +6,32 @@ or was proven bypassable during review. Add a case before changing the guard.
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GUARD = os.path.join(HERE, "guard.py")
 REPO = os.path.dirname(os.path.dirname(HERE))
+
+
+def scratch_repo(branch):
+    """A throwaway git repo on a known branch.
+
+    The guard's commit rule asks git which branch HEAD is on, so any test of it
+    must control that. Using the real repository made the result depend on
+    whatever branch the suite happened to run in — green locally on a task
+    branch, red in CI where the runner checks out on main.
+    """
+    path = tempfile.mkdtemp(prefix="guard-test-")
+    subprocess.run(["git", "init", "-q", "-b", branch, path], check=True,
+                   capture_output=True)
+    return path
+
+
+ON_MAIN = scratch_repo("main")
+ON_TASK = scratch_repo("task/001.1-example")
 
 SUB = {"agent_type": "developer", "cwd": REPO}
 MAIN = {"cwd": REPO}
@@ -64,7 +84,14 @@ CASES = [
     # --- ordinary work must not be blocked ---
     ("run the gates", case(SUB, "Bash", {"command": "npm run gates"}), ALLOW),
     ("create a task branch", case(SUB, "Bash", {"command": "git checkout -b task/003.1-auth"}), ALLOW),
-    ("commit on a task branch", case(SUB, "Bash", {"command": "git commit -m 'feat: x'"}), ALLOW),
+    # Branch-dependent: run against throwaway repos so the result does not
+    # depend on which branch the suite happens to execute in.
+    ("subagent commits on a task branch",
+     case({"agent_type": "developer", "cwd": ON_TASK}, "Bash", {"command": "git commit -m 'feat: x'"}), ALLOW),
+    ("subagent commits while on main",
+     case({"agent_type": "developer", "cwd": ON_MAIN}, "Bash", {"command": "git commit -m 'feat: x'"}), BLOCK),
+    ("orchestrator commits while on main",
+     case({"cwd": ON_MAIN}, "Bash", {"command": "git commit -m 'docs: x'"}), ALLOW),
     ("write a test file", case(SUB, "Bash", {"command": "echo x > poc/app/tests/new.test.ts"}), ALLOW),
     ("grep for .env in docs", case(SUB, "Bash", {"command": "grep -r .env docs/"}), ALLOW),
 
@@ -78,6 +105,15 @@ CASES = [
 
 
 def run():
+    failures = 0
+    try:
+        return check()
+    finally:
+        for path in (ON_MAIN, ON_TASK):
+            shutil.rmtree(path, ignore_errors=True)
+
+
+def check():
     failures = 0
     for name, payload, want in CASES:
         result = subprocess.run([sys.executable, GUARD], input=json.dumps(payload),
