@@ -42,3 +42,26 @@ there. The rest of `tests/` (`dueDate.test.ts`, `errors.test.ts`,
 had no other seeding loops above the ~20-fixture threshold;
 `tasks-overdue.test.ts`'s perf test was already using the correct pattern
 and served as the reference implementation.
+
+## Root-cause correction (recorded during review, 2026-09-11)
+
+The original diagnosis in the Intent above — socket *exhaustion* from HTTP
+seeding — was incomplete, and the first implementation only reduced the
+symptom (measured 7/8 clean, down from ~4/5, but still failing).
+
+Adding the in-loop status assertion required by done-criterion 2 exposed the
+actual mechanism: a failing run reported `expected 404 to be 201` from a valid
+`POST /tasks`. Our app has no code path returning 404 for that request, so the
+response did not come from the app under test. `request(app)` starts a **fresh
+ephemeral-port server per call**; at loop volume those ports intermittently
+collide with other local processes, and the request is answered by whatever
+else holds the port. (The TASK-002.2 reviewer saw the same signature from a
+different port — a stray `401` — and attributed it to socket pressure.)
+
+Fix: `tests/support/server.ts` exposes `withServer(app, fn)`, which binds one
+server for the whole loop and closes it afterwards. All five perf tests now
+use it. Measured after the change: **10/10 consecutive clean full-suite runs.**
+
+This is also a concrete argument for done-criterion 2: without the in-loop
+status assertion, a response from the wrong server was simply timed and
+counted as a pass — the suite was green while measuring nothing.
