@@ -37,6 +37,20 @@
 1. <Given/when/then or equivalent testable statement>
 2. …
 
+## Verification that CI cannot perform
+
+<!-- Delete this section for Tier-1 (fully CI-verifiable) projects.
+
+     Required whenever the project's `verification.tier` in pipeline.config.json
+     is "emulator" or "device" — mobile apps, kiosk/COSU behaviour, embedded
+     firmware, hardware integrations. List exactly what a human must check, on
+     what hardware, and what the pass condition is. An agent cannot close these,
+     and the reviewer will not approve a spec that needs them but omits them. -->
+
+| # | What must be verified | Where | Pass condition |
+|---|---|---|---|
+| M1 | <e.g. app relaunches into lock task mode after forced reboot> | <provisioned device owner, Pixel 6a / Android 14> | <returns to kiosk screen within 30s, no system UI reachable> |
+
 ## Design
 
 <!-- Architect agent fills this section only for design-significant specs; otherwise delete. -->
