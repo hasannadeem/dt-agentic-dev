@@ -28,14 +28,27 @@ import re
 import subprocess
 import sys
 
-DEFAULT_SECRETS = [".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa*"]
-DEFAULT_PLATFORM = [".claude/*", ".claude/**/*", ".github/workflows/*"]
+DEFAULT_SECRETS = [".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa*",
+                   "credentials", ".npmrc", ".netrc"]
+# pipeline.config.json belongs here: CI executes its values, so an agent able to
+# edit it gains command execution in CI — which would defeat the rule that
+# agents cannot touch CI at all.
+DEFAULT_PLATFORM = [".claude/*", ".claude/**/*", ".github/workflows/*",
+                    "pipeline.config.json"]
+
+# Redirections that write nowhere meaningful. Counting these as writes made the
+# guard block read-only commands that merely ended in `2>/dev/null`.
+NOISE_REDIRECTS = re.compile(r"\d?>&?\d?\s*/dev/null|\d>&\d")
 
 # Bash constructs that can write to a path without using a file tool.
 WRITE_OPS = re.compile(
     r"(>>?|\|\s*tee\b|\bsed\b[^|;&]*-i|\bcp\b|\bmv\b|\bdd\b|\btruncate\b|"
     r"\brm\b|\bchmod\b|\btouch\b|\bln\b)"
 )
+
+# Reading a secret is as damaging as writing one: it lands in the agent's
+# context, and from there in transcripts, logs and any output it produces.
+READ_TOOLS = ("Read", "Grep")
 
 FORBIDDEN_CMDS = [
     (re.compile(r"\bgit\s+push\b(?![^;&|]*--dry-run)[^;&|]*\b(origin\s+)?(HEAD:)?(main|master)\b"),
@@ -61,9 +74,13 @@ def load_config(cwd):
     except Exception:
         return DEFAULT_SECRETS, DEFAULT_PLATFORM
     guard = cfg.get("guard") or {}
-    secrets = guard.get("secretPaths") or DEFAULT_SECRETS
-    platform = guard.get("platformPaths") or DEFAULT_PLATFORM
-    return list(secrets), list(platform)
+    # Union, never replace. The config is itself a protected path, but treating
+    # its lists as authoritative would still mean a weaker config anywhere —
+    # a fresh install, a project that trimmed the defaults — silently lowers the
+    # floor. Projects may add protections; they cannot remove them.
+    secrets = set(DEFAULT_SECRETS) | set(guard.get("secretPaths") or [])
+    platform = set(DEFAULT_PLATFORM) | set(guard.get("platformPaths") or [])
+    return sorted(secrets), sorted(platform)
 
 
 def blank_heredocs(cmd):
@@ -160,8 +177,16 @@ def main():
         if matches(rel, secrets):
             deny("secrets are never editable (%s)." % rel)
         if is_subagent and matches(rel, platform):
-            deny("subagents cannot edit agent definitions, slash commands or CI "
-                 "workflows (%s)." % rel)
+            deny("subagents cannot edit agent definitions, slash commands, CI "
+                 "workflows or the pipeline config (%s)." % rel)
+        sys.exit(0)
+
+    if tool in READ_TOOLS:
+        for key in ("file_path", "path", "pattern"):
+            rel = relative(str(tool_input.get(key, "") or ""), cwd)
+            if rel and matches(rel, secrets):
+                deny("secrets are never readable (%s) — reading one puts it in "
+                     "the transcript." % rel)
         sys.exit(0)
 
     if tool == "Bash":
@@ -187,13 +212,22 @@ def main():
             if pattern.search(cmd):
                 deny("%s." % why)
 
-        if WRITE_OPS.search(cmd):
-            # Only inspect paths when the command can actually write.
-            for token in re.findall(r"[\w./~@+-]+", cmd):
-                rel = relative(token, cwd)
-                if matches(rel, secrets):
-                    deny("that command can write to a secrets file (%s)." % token)
-                if is_subagent and matches(rel, platform):
+        tokens = re.findall(r"[\w./~@+-]+", cmd)
+
+        # Secrets: any mention at all, read or write. `cat .env` is as damaging
+        # as writing it — the contents land in the transcript either way. This
+        # check used to sit inside the write-detection branch, which left every
+        # read path open.
+        for token in tokens:
+            if matches(relative(token, cwd), secrets):
+                deny("that command touches a secrets file (%s); secrets are "
+                     "neither readable nor writable by agents." % token)
+
+        # Platform config: only writes matter, so ignore redirects that go
+        # nowhere (`2>/dev/null`) before deciding the command writes anything.
+        if WRITE_OPS.search(NOISE_REDIRECTS.sub(" ", cmd)) and is_subagent:
+            for token in tokens:
+                if matches(relative(token, cwd), platform):
                     deny("that command can write to protected platform config "
                          "(%s)." % token)
         sys.exit(0)

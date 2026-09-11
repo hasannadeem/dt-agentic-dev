@@ -13,7 +13,24 @@
     "tasks": "tasks"
   },
   "guard": {
-    "secretPaths": [".env", ".env.*", "*.pem", "*.key", "*.p12", "*.pfx", "id_rsa*"],
-    "platformPaths": [".claude/*", ".claude/**/*", ".github/workflows/*"]
+    "secretPaths": [
+      ".env",
+      ".env.*",
+      "*.pem",
+      "*.key",
+      "*.p12",
+      "*.pfx",
+      "id_rsa*",
+      "credentials",
+      ".npmrc",
+      ".netrc"
+    ],
+    "platformPaths": [
+      ".claude/*",
+      ".claude/**/*",
+      ".github/workflows/*",
+      "pipeline.config.json",
+      "scripts/ci-config.mjs"
+    ]
   }
 }

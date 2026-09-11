@@ -5,47 +5,94 @@ on:
   push:
     branches: [main]
 
+# Least privilege by default; jobs escalate only what they need.
+permissions:
+  contents: read
+
 jobs:
   platform:
     name: platform conventions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: 22
-      # Our docs claim "traceability by construction"; these two steps are what
-      # make that mechanical rather than honour-system.
+      # Our docs claim "traceability by construction"; these steps are what make
+      # that mechanical rather than honour-system.
       - name: Validate spec/task artifacts
         run: node scripts/validate-artifacts.mjs
       - name: Governance guard scenarios
         run: python3 .claude/hooks/guard_test.py
 
+  secrets:
+    name: secret scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      # governance doc claimed this existed before it did. AI-assisted commits
+      # leak secrets at roughly twice the baseline rate, so this is not optional.
+      - name: Scan history for secrets
+        uses: gitleaks/gitleaks-action@83373cf2f8c4db6e24b41c1a9b086bb9619e9cd3 # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependencies:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Read pipeline config
+        id: cfg
+        run: node scripts/ci-config.mjs >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 22
+      # Agents hallucinate package names at a measurable rate, so a new
+      # dependency is reviewed as a change in its own right.
+      - name: Flag dependency changes for human review
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          APP_DIR: ${{ steps.cfg.outputs.dir }}
+        run: |
+          set -eu
+          git fetch --quiet origin "$BASE" "$HEAD" 2>/dev/null || true
+          if git diff --name-only "$BASE" "$HEAD" | grep -qE 'package\.json|requirements.*\.txt|go\.mod|Cargo\.toml|Gemfile'; then
+            echo "::warning::Dependency manifest changed — a human must confirm every added package name is real before merge."
+          fi
+      - name: Audit dependencies
+        working-directory: ${{ steps.cfg.outputs.dir }}
+        run: npm audit --audit-level=high
+
   app:
     name: application gates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       # Project layout and gate command come from pipeline.config.json, so this
-      # workflow ports to another project without edits.
+      # workflow ports to another project without edits. The reader validates
+      # the values and writes them safely; never interpolate repo-controlled
+      # content directly into `run:` — that is a shell-injection path, and it is
+      # how the Nx supply-chain compromise began.
       - name: Read pipeline config
         id: cfg
-        run: |
-          node -e "
-            const c = require('./pipeline.config.json');
-            const out = process.env.GITHUB_OUTPUT;
-            require('fs').appendFileSync(out, 'dir=' + (c.app?.dir ?? '.') + '\n');
-            require('fs').appendFileSync(out, 'install=' + (c.app?.install ?? '') + '\n');
-            require('fs').appendFileSync(out, 'gates=' + (c.gates?.command ?? '') + '\n');
-          "
-      - uses: actions/setup-node@v4
+        run: node scripts/ci-config.mjs >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: ${{ steps.cfg.outputs.dir }}/package-lock.json
       - name: Install dependencies
         working-directory: ${{ steps.cfg.outputs.dir }}
-        run: ${{ steps.cfg.outputs.install }}
+        env:
+          INSTALL_CMD: ${{ steps.cfg.outputs.install }}
+        run: sh -c "$INSTALL_CMD"
       - name: Run gates
         working-directory: ${{ steps.cfg.outputs.dir }}
-        run: ${{ steps.cfg.outputs.gates }}
+        env:
+          GATES_CMD: ${{ steps.cfg.outputs.gates }}
+        run: sh -c "$GATES_CMD"
