@@ -93,22 +93,39 @@ async function bindTestServer(): Promise<TestServer> {
  *   after a later `request(otherApp)` call is answered by `otherApp`, not
  *   `app` — e.g. `const p = request(a).get('/x'); request(b); await p;`
  *   resolves `p` against `b`.
- * - A request sent before `request(app)` has been called even once in the
- *   file hangs until the test timeout instead of erroring: the server is
- *   created with no `'request'` listener attached until the first `use()`.
+ *
+ * The server is created with no `'request'` listener, which is why only this
+ * wrapper is exported: the raw server is never reachable, and the wrapper
+ * always installs a listener before building a request, so no test can issue
+ * one against an unattached server.
  */
 export function setupTestServer(): (app: Express) => ReturnType<typeof supertestRequest> {
-  let testServer: TestServer;
+  let testServer: TestServer | undefined;
+  let serverError: Error | undefined;
 
   beforeAll(async () => {
     testServer = await bindTestServer();
+    testServer.server.on('error', (err) => {
+      // Captured rather than only logged: an error raised while no request is
+      // in flight would otherwise leave a passing run with a stderr line
+      // nobody reads. Rethrown below so the file fails loudly instead.
+      serverError ??= err;
+    });
   });
 
   afterAll(async () => {
-    await testServer.close();
+    // Guarded: if bindTestServer rejected, this would otherwise throw a
+    // TypeError that buries the real beforeAll failure.
+    await testServer?.close();
+    if (serverError) throw serverError;
   });
 
   return (app: Express): ReturnType<typeof supertestRequest> => {
+    if (!testServer) {
+      // Only reachable if a test issues a request outside the beforeAll/afterAll
+      // window. A clear message beats a TypeError about undefined.
+      throw new Error('setupTestServer(): no server bound — call request(app) from inside a test.');
+    }
     testServer.use(app);
     return supertestRequest(testServer.server);
   };
