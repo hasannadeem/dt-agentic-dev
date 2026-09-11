@@ -61,6 +61,19 @@ CASES = [
     ("gh pr merge", case(SUB, "Bash", {"command": "gh pr merge 7 --squash"}), BLOCK),
     ("reset --hard", case(SUB, "Bash", {"command": "git reset --hard HEAD~1"}), BLOCK),
     ("push a task branch", case(SUB, "Bash", {"command": "git push -u origin task/003.1-auth"}), ALLOW),
+    # Regression: `main` matched as a substring, so ordinary branch names were
+    # blocked. Found when a branch literally named for this rule could not be
+    # pushed.
+    ("push a branch whose name contains main",
+     case(SUB, "Bash", {"command": "git push -u origin task/000.8-main-access-rule"}), ALLOW),
+    ("push a branch named for a domain",
+     case(SUB, "Bash", {"command": "git push origin fix/domain-logic"}), ALLOW),
+    ("push a branch named mainframe",
+     case(SUB, "Bash", {"command": "git push origin feature/mainframe-sync"}), ALLOW),
+    ("push HEAD to main is still caught",
+     case(SUB, "Bash", {"command": "git push origin HEAD:main"}), BLOCK),
+    ("push main with no remote is still caught",
+     case(SUB, "Bash", {"command": "git push main"}), BLOCK),
 
     # --- quoted text is data, not a command (false positives that blocked real work) ---
     ("commit message naming gh pr merge",

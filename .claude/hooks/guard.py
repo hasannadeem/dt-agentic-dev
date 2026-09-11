@@ -51,8 +51,12 @@ WRITE_OPS = re.compile(
 READ_TOOLS = ("Read", "Grep")
 
 FORBIDDEN_CMDS = [
-    (re.compile(r"\bgit\s+push\b(?![^;&|]*--dry-run)[^;&|]*\b(origin\s+)?(HEAD:)?(main|master)\b"),
-     "nothing reaches main except through a merged PR — push a branch instead"),
+    # The ref must be a whole argument. Matching `main` as a substring blocked
+    # ordinary branch names — `task/000.8-main-access-rule`, `fix/domain-logic`,
+    # `feature/mainframe` — because a hyphen counts as a word boundary. A guard
+    # that blocks legitimate work teaches agents to route around it.
+    (re.compile(r"\bgit\s+push\b(?![^;&|]*--dry-run)[^;&|]*(?:\s|:)(?:HEAD:)?(?:main|master)(?=\s|$)"),
+     "nothing reaches the default branch except through a merged PR — push a task branch instead"),
     (re.compile(r"\bgit\s+push\b[^;&|]*(--force\b|--force-with-lease\b|\s-f\b)"),
      "force-push is forbidden"),
     (re.compile(r"\bgh\s+pr\s+merge\b"), "merging is a human-only action"),
