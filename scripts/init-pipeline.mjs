@@ -50,7 +50,9 @@ const TOOLCHAINS = [
       try { scripts = JSON.parse(readFileSync(pkgPath, 'utf8')).scripts ?? {}; } catch { /* unreadable */ }
       if (scripts.gates) return 'npm run gates';
       const parts = ['lint', 'typecheck', 'test'].filter((s) => scripts[s]).map((s) => `npm run ${s}`);
-      return parts.length ? parts.join(' && ') : 'npm test';
+      // Returning a command that cannot pass is worse than returning nothing:
+      // the pipeline's entire quality model assumes the gate is real.
+      return parts.length ? parts.join(' && ') : null;
     },
   },
   { id: 'python', marker: 'pyproject.toml', language: 'python', install: 'pip install -e ".[dev]"', gates: () => 'ruff check . && mypy . && pytest' },
@@ -143,9 +145,36 @@ if (!configExists && !dryRun) {
 }
 
 console.log(`\nInstalling the agentic pipeline into ${target}${dryRun ? ' (dry run)' : ''}\n`);
-console.log(detected
-  ? `  Detected ${detected.language} in "${appDir}" — gates: ${config.gates.command}`
-  : `  No known toolchain detected. Set app.dir and gates.command in pipeline.config.json by hand.`);
+const gatesUsable = Boolean(config.gates.command);
+if (detected && gatesUsable) {
+  console.log(`  Detected ${detected.language} in "${appDir}" — gates: ${config.gates.command}`);
+} else if (detected) {
+  console.log(`  Detected ${detected.language} in "${appDir}", but found no usable gate command.`);
+} else {
+  console.log('  No known toolchain detected. Set app.dir and gates.command in pipeline.config.json by hand.');
+}
+
+if (!gatesUsable) {
+  console.log(`
+  ⚠  THIS PROJECT HAS NO QUALITY GATE.
+
+     The pipeline's safety model rests entirely on a gate command that fails
+     when the code is wrong. Without one, agents will write code with nothing
+     checking it, the reviewer's verdict becomes the only signal, and "all
+     gates green" means nothing. Do not run the pipeline in this state.
+
+     Before using it here, give the project a real gate:
+       1. Add a test runner and enough characterisation tests to capture what
+          the code does today — start with the paths you would be most afraid
+          to break.
+       2. Add linting, and type-checking if the language supports it.
+       3. Put the combined command in gates.command and confirm it passes on a
+          clean checkout, then confirm it FAILS when you deliberately break
+          something. An unfalsifiable gate is not a gate.
+
+     Untested codebases need this bootstrap step first — it is not yet
+     automated. See docs/10-improvement-backlog.md.`);
+}
 console.log(`\n  Copied  ${copied.length} file(s)`);
 if (skipped.length) {
   console.log(`  Skipped ${skipped.length} existing file(s) — review these yourself:`);

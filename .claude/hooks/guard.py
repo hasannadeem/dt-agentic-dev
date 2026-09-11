@@ -171,8 +171,11 @@ def main():
         # pushing does — this is how TASK-000.1's first attempt landed on main.
         if is_subagent and COMMIT_CMD.search(cmd):
             try:
+                # `branch --show-current` reports the branch even in a repo with
+                # no commits yet, where `rev-parse HEAD` errors and would leave
+                # this check silently open. It prints nothing on detached HEAD.
                 branch = subprocess.run(
-                    ["git", "-C", cwd, "rev-parse", "--abbrev-ref", "HEAD"],
+                    ["git", "-C", cwd, "branch", "--show-current"],
                     capture_output=True, text=True, timeout=5).stdout.strip()
             except Exception:
                 branch = ""
