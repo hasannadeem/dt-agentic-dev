@@ -3,7 +3,7 @@
 **Spec:** none (maintenance fix — per CLAUDE.md spec threshold, a small behavioral change carries its micro-spec here)
 **Size:** S
 **Depends on:** none
-**Status:** Todo
+**Status:** In review
 **Branch:** task/000.1-deflake-perf-seeding
 
 ## Intent (micro-spec)
@@ -26,3 +26,19 @@
 ## Notes / escalations
 
 Identified by the code-reviewer agent during the TASK-002.2 review, which flagged it as pre-existing and out of scope for that task and recommended a follow-up. This is that follow-up.
+
+**Audit finding (done-criterion 3):** in addition to the two perf tests in
+`tests/tasks-complete-delete.test.ts` named in the intent text above, the
+audit found a third offender: `tests/tasks.test.ts`'s
+`p95 latency for GET /tasks is under 100ms ...` perf test also seeded 30
+tasks via a sequential HTTP loop (`await request(app).post('/tasks')...`)
+before its timed loop. This was migrated to the same in-process
+`TaskStore` + `createApp(store)` pattern. `tests/tasks.test.ts`'s
+`POST /tasks` perf test was left unchanged — its loop *is* the measured
+operation, not a seeding step, so there is no HTTP-seeding flakiness risk
+there. The rest of `tests/` (`dueDate.test.ts`, `errors.test.ts`,
+`health.test.ts`, `taskStore.test.ts`, `taskTitle.test.ts`,
+`tasks-overdue.test.ts`) was checked (grep for loop/seeding patterns) and
+had no other seeding loops above the ~20-fixture threshold;
+`tasks-overdue.test.ts`'s perf test was already using the correct pattern
+and served as the reference implementation.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
+import { TaskStore } from '../src/store/taskStore.js';
 
 function expectTaskShape(body: unknown, title: string, dueDate: string | null = null): void {
   const task = body as {
@@ -245,12 +246,19 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
   });
 
   it('p95 latency for GET /tasks is under 100ms across a batch of sequential requests', async () => {
-    const app = createApp();
+    // Seeded in-process via a directly-constructed TaskStore, not via
+    // sequential supertest/HTTP requests — HTTP seeding loops caused
+    // intermittent socket hang-ups under full-suite parallelism. The
+    // measured requests below still go through the real HTTP layer via
+    // supertest, so the latency being measured is still the full
+    // GET /tasks request path.
+    const seedStore = new TaskStore();
     const requestCount = 30;
 
     for (let i = 0; i < requestCount; i += 1) {
-      await request(app).post('/tasks').send({ title: `Task ${i}` });
+      seedStore.create(`Task ${i}`);
     }
+    const app = createApp(seedStore);
 
     const getDurations: number[] = [];
     for (let i = 0; i < requestCount; i += 1) {
