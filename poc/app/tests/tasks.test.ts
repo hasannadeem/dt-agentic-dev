@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
+import { TaskStore } from '../src/store/taskStore.js';
+import { withServer } from './support/server.js';
 
 function expectTaskShape(body: unknown, title: string, dueDate: string | null = null): void {
   const task = body as {
@@ -235,29 +237,49 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
     const requestCount = 30;
     const postDurations: number[] = [];
 
-    for (let i = 0; i < requestCount; i += 1) {
-      const start = performance.now();
-      await request(app).post('/tasks').send({ title: `Task ${i}` });
-      postDurations.push(performance.now() - start);
-    }
+    await withServer(app, async (server) => {
+      for (let i = 0; i < requestCount; i += 1) {
+        const start = performance.now();
+        const res = await request(server).post('/tasks').send({ title: `Task ${i}` });
+        postDurations.push(performance.now() - start);
+        expect(res.status).toBe(201);
+      }
+    });
 
     expect(p95(postDurations)).toBeLessThan(100);
   });
 
   it('p95 latency for GET /tasks is under 100ms across a batch of sequential requests', async () => {
-    const app = createApp();
+    // Seeded in-process via a directly-constructed TaskStore, not via
+    // sequential supertest/HTTP requests — HTTP seeding loops caused
+    // intermittent socket hang-ups under full-suite parallelism. The
+    // measured requests below still go through the real HTTP layer via
+    // supertest, so the latency being measured is still the full
+    // GET /tasks request path.
+    const seedStore = new TaskStore();
     const requestCount = 30;
 
     for (let i = 0; i < requestCount; i += 1) {
-      await request(app).post('/tasks').send({ title: `Task ${i}` });
+      seedStore.create(`Task ${i}`);
     }
+    const app = createApp(seedStore);
 
+    // Guards the premise of this migration: if the seeded store were not wired
+    // into the app, GET /tasks would return [] *faster* and a latency-only
+    // assertion would still pass.
     const getDurations: number[] = [];
-    for (let i = 0; i < requestCount; i += 1) {
-      const start = performance.now();
-      await request(app).get('/tasks');
-      getDurations.push(performance.now() - start);
-    }
+    await withServer(app, async (server) => {
+      const seedCheck = await request(server).get('/tasks');
+      expect(seedCheck.status).toBe(200);
+      expect(seedCheck.body).toHaveLength(requestCount);
+
+      for (let i = 0; i < requestCount; i += 1) {
+        const start = performance.now();
+        const res = await request(server).get('/tasks');
+        getDurations.push(performance.now() - start);
+        expect(res.status).toBe(200);
+      }
+    });
 
     expect(p95(getDurations)).toBeLessThan(100);
   });

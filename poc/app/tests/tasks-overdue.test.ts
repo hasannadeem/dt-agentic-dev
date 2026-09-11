@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { TaskStore } from '../src/store/taskStore.js';
+import { withServer } from './support/server.js';
 
 // Fixed, deterministic ISO 8601 UTC strings — always in the past/future
 // relative to any real wall-clock time this suite will ever run at, so
@@ -282,12 +283,14 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
 
     const requestCount = 20;
     const overdueDurations: number[] = [];
-    for (let i = 0; i < requestCount; i += 1) {
-      const start = performance.now();
-      const res = await request(app).get('/tasks/overdue');
-      overdueDurations.push(performance.now() - start);
-      expect(res.status).toBe(200);
-    }
+    await withServer(app, async (server) => {
+      for (let i = 0; i < requestCount; i += 1) {
+        const start = performance.now();
+        const res = await request(server).get('/tasks/overdue');
+        overdueDurations.push(performance.now() - start);
+        expect(res.status).toBe(200);
+      }
+    });
 
     expect(p95(overdueDurations)).toBeLessThan(150);
   });

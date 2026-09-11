@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
+import { TaskStore } from '../src/store/taskStore.js';
+import { withServer } from './support/server.js';
 
 async function createTask(app: ReturnType<typeof createApp>, title: string, dueDate?: string) {
   const res = await request(app)
@@ -140,41 +142,55 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
   }
 
   it('p95 latency for POST /tasks/:id/complete is under 100ms across a batch of sequential requests', async () => {
-    const app = createApp();
+    // Seeded in-process via a directly-constructed TaskStore, not via
+    // sequential supertest/HTTP requests — HTTP seeding loops caused
+    // intermittent socket hang-ups under full-suite parallelism. The
+    // measured requests below still go through the real HTTP layer via
+    // supertest, so the latency being measured is still the full
+    // POST /tasks/:id/complete request path.
+    const seedStore = new TaskStore();
     const requestCount = 30;
     const ids: string[] = [];
     for (let i = 0; i < requestCount; i += 1) {
-      const task = await createTask(app, `Task ${i}`);
+      const task = seedStore.create(`Task ${i}`);
       ids.push(task.id);
     }
+    const app = createApp(seedStore);
 
     const completeDurations: number[] = [];
-    for (const id of ids) {
-      const start = performance.now();
-      const res = await request(app).post(`/tasks/${id}/complete`);
-      completeDurations.push(performance.now() - start);
-      expect(res.status).toBe(200);
-    }
+    await withServer(app, async (server) => {
+      for (const id of ids) {
+        const start = performance.now();
+        const res = await request(server).post(`/tasks/${id}/complete`);
+        completeDurations.push(performance.now() - start);
+        expect(res.status).toBe(200);
+      }
+    });
 
     expect(p95(completeDurations)).toBeLessThan(100);
   });
 
   it('p95 latency for DELETE /tasks/:id is under 100ms across a batch of sequential requests', async () => {
-    const app = createApp();
+    // Seeded in-process via a directly-constructed TaskStore — see rationale
+    // in the POST /tasks/:id/complete perf test above.
+    const seedStore = new TaskStore();
     const requestCount = 30;
     const ids: string[] = [];
     for (let i = 0; i < requestCount; i += 1) {
-      const task = await createTask(app, `Task ${i}`);
+      const task = seedStore.create(`Task ${i}`);
       ids.push(task.id);
     }
+    const app = createApp(seedStore);
 
     const deleteDurations: number[] = [];
-    for (const id of ids) {
-      const start = performance.now();
-      const res = await request(app).delete(`/tasks/${id}`);
-      deleteDurations.push(performance.now() - start);
-      expect(res.status).toBe(204);
-    }
+    await withServer(app, async (server) => {
+      for (const id of ids) {
+        const start = performance.now();
+        const res = await request(server).delete(`/tasks/${id}`);
+        deleteDurations.push(performance.now() - start);
+        expect(res.status).toBe(204);
+      }
+    });
 
     expect(p95(deleteDurations)).toBeLessThan(100);
   });
