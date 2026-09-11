@@ -32,5 +32,8 @@
       "pipeline.config.json",
       "scripts/ci-config.mjs"
     ]
+  },
+  "verification": {
+    "tier": "host"
   }
 }
