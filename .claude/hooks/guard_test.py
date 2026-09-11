@@ -93,7 +93,29 @@ CASES = [
     ("orchestrator commits while on main",
      case({"cwd": ON_MAIN}, "Bash", {"command": "git commit -m 'docs: x'"}), ALLOW),
     ("write a test file", case(SUB, "Bash", {"command": "echo x > poc/app/tests/new.test.ts"}), ALLOW),
-    ("grep for .env in docs", case(SUB, "Bash", {"command": "grep -r .env docs/"}), ALLOW),
+    # Deliberately strict: a bare `.env` token is treated as the file even when
+    # it was meant as a search string. Over-blocking on secrets is the safe
+    # direction, and the deny message tells the agent to rephrase.
+    ("grep for the literal string .env", case(SUB, "Bash", {"command": "grep -r .env docs/"}), BLOCK),
+    ("grep for dotenv wording instead", case(SUB, "Bash", {"command": "grep -r dotenv docs/"}), ALLOW),
+
+    # --- reading secrets is as damaging as writing them (gap found 2026-09-11) ---
+    ("subagent cats a secrets file", case(SUB, "Bash", {"command": "cat .env"}), BLOCK),
+    ("subagent greps a secrets file", case(SUB, "Bash", {"command": "grep KEY .env.production"}), BLOCK),
+    ("orchestrator cats a secrets file", case(MAIN, "Bash", {"command": "cat .env"}), BLOCK),
+    ("Read tool on a secrets file", case(SUB, "Read", {"file_path": "/r/.env"}), BLOCK),
+    ("Read tool on ssh key", case(SUB, "Read", {"file_path": "/r/id_rsa"}), BLOCK),
+    ("Read tool on ordinary source", case(SUB, "Read", {"file_path": REPO + "/poc/app/src/app.ts"}), ALLOW),
+
+    # --- pipeline.config.json drives CI, so subagents may not edit it ---
+    ("subagent edits pipeline config", case(SUB, "Edit", {"file_path": REPO + "/pipeline.config.json"}), BLOCK),
+    ("subagent rewrites pipeline config via shell",
+     case(SUB, "Bash", {"command": "echo '{}' > pipeline.config.json"}), BLOCK),
+    ("orchestrator edits pipeline config", case(MAIN, "Edit", {"file_path": REPO + "/pipeline.config.json"}), ALLOW),
+
+    # --- false positive that blocked read-only work ---
+    ("read-only command ending in 2>/dev/null",
+     case(SUB, "Bash", {"command": "ls .claude/hooks/guard.py 2>/dev/null"}), ALLOW),
 
     # --- file tools ---
     ("subagent edits an agent def", case(SUB, "Edit", {"file_path": REPO + "/.claude/agents/developer.md"}), BLOCK),
