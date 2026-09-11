@@ -46,6 +46,7 @@ Approach: a practical 70% implementation delivered quickly and improved iterativ
 | [docs/metrics-log.md](docs/metrics-log.md) | Per-run pipeline metrics (speed, quality, review catches) |
 | [docs/10-improvement-backlog.md](docs/10-improvement-backlog.md) | Competitive/platform research → prioritized improvement backlog |
 | [docs/11-capability-tiers.md](docs/11-capability-tiers.md) | What CI can verify per project type — and what needs a device or a human |
+| [docs/12-team-onboarding.md](docs/12-team-onboarding.md) | **Adopting this on your own project — read the safety rules first** |
 | [docs/09-demo-runbook.md](docs/09-demo-runbook.md) | Live team-demo script with fallback plan |
 | [.claude/commands/](.claude/commands/) | Modular stage commands: /pipeline-spec → plan → dev → review, /pipeline-status |
 | [docs/00-charter.md](docs/00-charter.md) | Project charter: goals, stakeholders, working model |

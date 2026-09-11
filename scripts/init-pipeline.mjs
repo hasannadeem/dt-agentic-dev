@@ -137,12 +137,13 @@ const PAYLOAD = [
   '.claude/commands',
   '.claude/hooks',
   '.claude/settings.json',
-  'CLAUDE.md',
   'scripts/validate-artifacts.mjs',
   'scripts/ci-config.mjs',
   'scripts/doctor.mjs',
   'templates/ci.yml.template',
   'docs/11-capability-tiers.md',
+  'docs/04-governance.md',
+  'docs/12-team-onboarding.md',
   'specs/spec-template.md',
   'tasks/task-template.md',
 ];
@@ -213,6 +214,25 @@ for (const rel of PAYLOAD) copyPath(rel);
 // gates decide what is acceptable" — without CI the gates only run wherever an
 // agent happens to run them, which is exactly the assurance we are trying not
 // to rely on.
+// CLAUDE.md is the agents' rulebook, so shipping this repository's copy told
+// every other project its code lived in poc/app and its gate was `npm run
+// gates` — contradicting the very instruction on the next line to read those
+// from the config. Generate it from the detected project instead.
+const claudePath = join(target, 'CLAUDE.md');
+let claudeNote;
+if (existsSync(claudePath)) {
+  claudeNote = 'kept your existing CLAUDE.md — check it names the right app dir and gate command';
+} else {
+  const body = readFileSync(join(SOURCE, 'templates/CLAUDE.md.template'), 'utf8')
+    .replaceAll('{{APP_DIR}}', appDir === '.' ? 'the repository root' : `${appDir}/`)
+    .replaceAll('{{GATES}}', config.gates.command || '(not configured)')
+    .replaceAll('{{CODE_SCOPE}}', appDir === '.'
+      ? 'application source and anything under `scripts/`'
+      : `anything under \`${appDir}/\` or \`scripts/\``);
+  if (!dryRun) writeFileSync(claudePath, body);
+  claudeNote = 'wrote CLAUDE.md for this project';
+}
+
 const workflowPath = join(target, '.github/workflows/ci.yml');
 let workflowNote;
 if (existsSync(workflowPath)) {
@@ -279,6 +299,7 @@ if (skipped.length) {
   for (const s of skipped) console.log(`            ${s}`);
 }
 console.log(configExists ? '  Kept    existing pipeline.config.json' : '  Wrote   pipeline.config.json');
+console.log(`  Rules   ${claudeNote}`);
 console.log(`  CI      ${workflowNote}`);
 
 console.log(`
@@ -292,5 +313,6 @@ Next steps:
      but only GitHub can enforce it for humans and other tools.
   5. Open the project in Claude Code and run /pipeline-spec "<your first requirement>".
 
-Read docs/08-operator-guide.md in this repository for how the stages work.
+Read docs/12-team-onboarding.md (copied into your project) before your first run —
+it covers the safety rules that matter while sandboxing is still missing.
 `);
