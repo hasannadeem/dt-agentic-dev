@@ -6,9 +6,17 @@
 
 ## Open questions & assumptions
 
-<!-- Deliberately first: the approver reads the doubts before the plan. -->
-- **Q:** <anything genuinely ambiguous in the requirement>
-- **A:** <every assumption made to fill a gap, explicitly labeled>
+<!-- Deliberately first: the approver reads the doubts before the plan.
+     Every item is tagged so the approver knows what actually needs their judgment:
+       [DECIDE]  — needs a human decision: changes the shape of the feature, is
+                   expensive to reverse, encodes a product/business/security
+                   trade-off, or depends on context not derivable from the repo.
+                   Max five per spec; more than that means the feature is too big.
+       [ASSUMED] — a convention filled in sensibly; a reviewer would shrug and agree. -->
+- **[DECIDE] Q:** <the genuinely consequential open question>
+  **Recommended:** <the analyst's proposed answer and why>
+- **[ASSUMED] Q:** <a gap filled by convention>
+  **A:** <what was assumed, and the pattern or precedent it follows>
 
 ## Problem
 
