@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
-import { TaskStore } from '../src/store/taskStore.js';
 
 async function createTask(app: ReturnType<typeof createApp>, title: string, dueDate?: string) {
   const res = await request(app)
@@ -141,20 +140,13 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
   }
 
   it('p95 latency for POST /tasks/:id/complete is under 100ms across a batch of sequential requests', async () => {
-    // Seeded in-process via a directly-constructed TaskStore, not via
-    // sequential supertest/HTTP requests — HTTP seeding loops caused
-    // intermittent socket hang-ups under full-suite parallelism. The
-    // measured requests below still go through the real HTTP layer via
-    // supertest, so the latency being measured is still the full
-    // POST /tasks/:id/complete request path.
-    const seedStore = new TaskStore();
+    const app = createApp();
     const requestCount = 30;
     const ids: string[] = [];
     for (let i = 0; i < requestCount; i += 1) {
-      const task = seedStore.create(`Task ${i}`);
+      const task = await createTask(app, `Task ${i}`);
       ids.push(task.id);
     }
-    const app = createApp(seedStore);
 
     const completeDurations: number[] = [];
     for (const id of ids) {
@@ -168,16 +160,13 @@ describe('performance smoke check (POC-scale, not a load-test harness)', () => {
   });
 
   it('p95 latency for DELETE /tasks/:id is under 100ms across a batch of sequential requests', async () => {
-    // Seeded in-process via a directly-constructed TaskStore — see rationale
-    // in the POST /tasks/:id/complete perf test above.
-    const seedStore = new TaskStore();
+    const app = createApp();
     const requestCount = 30;
     const ids: string[] = [];
     for (let i = 0; i < requestCount; i += 1) {
-      const task = seedStore.create(`Task ${i}`);
+      const task = await createTask(app, `Task ${i}`);
       ids.push(task.id);
     }
-    const app = createApp(seedStore);
 
     const deleteDurations: number[] = [];
     for (const id of ids) {
