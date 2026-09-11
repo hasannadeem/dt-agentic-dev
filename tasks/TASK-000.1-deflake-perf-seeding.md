@@ -34,9 +34,10 @@ audit found a third offender: `tests/tasks.test.ts`'s
 tasks via a sequential HTTP loop (`await request(app).post('/tasks')...`)
 before its timed loop. This was migrated to the same in-process
 `TaskStore` + `createApp(store)` pattern. `tests/tasks.test.ts`'s
-`POST /tasks` perf test was left unchanged — its loop *is* the measured
-operation, not a seeding step, so there is no HTTP-seeding flakiness risk
-there. The rest of `tests/` (`dueDate.test.ts`, `errors.test.ts`,
+`POST /tasks` perf test was left unchanged **at that point** — its loop *is*
+the measured operation, so it carried no HTTP-*seeding* risk. It was migrated
+later anyway (see the root-cause correction below): the real defect was
+per-call server binding, which that loop did share. The rest of `tests/` (`dueDate.test.ts`, `errors.test.ts`,
 `health.test.ts`, `taskStore.test.ts`, `taskTitle.test.ts`,
 `tasks-overdue.test.ts`) was checked (grep for loop/seeding patterns) and
 had no other seeding loops above the ~20-fixture threshold;
@@ -60,7 +61,22 @@ different port — a stray `401` — and attributed it to socket pressure.)
 
 Fix: `tests/support/server.ts` exposes `withServer(app, fn)`, which binds one
 server for the whole loop and closes it afterwards. All five perf tests now
-use it. Measured after the change: **10/10 consecutive clean full-suite runs.**
+use it.
+
+Stability, measured on the final branch state rather than an intermediate
+commit: **20/20 consecutive clean full-suite runs**, independently re-run by the
+code-reviewer agent in a clean worktree. An earlier "10/10" figure in this file
+described commit `cc56be3`, which the reviewer measured at 18/20 — that commit
+was missing the `tasks.test.ts` migration entirely. Same-machine pre-fix
+baselines differed (19/20 reviewer, ~4/5 orchestrator), so the absolute
+improvement is not statistically established at this sample size. What is
+established: runtime ephemeral-port binds drop ~211 → ~76, and the branch
+passes 20/20.
+
+**Remaining surface:** ~70 single-shot `request(app)` call sites still bind per
+call, so the same failure signature is possible there at lower probability.
+Both failures observed mid-review were in functional tests, not perf loops.
+Suite-wide rollout is TASK-000.3.
 
 This is also a concrete argument for done-criterion 2: without the in-loop
 status assertion, a response from the wrong server was simply timed and
