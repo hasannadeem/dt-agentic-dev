@@ -140,10 +140,26 @@ const PAYLOAD = [
   'CLAUDE.md',
   'scripts/validate-artifacts.mjs',
   'scripts/ci-config.mjs',
+  'scripts/doctor.mjs',
+  'templates/ci.yml.template',
   'docs/11-capability-tiers.md',
   'specs/spec-template.md',
   'tasks/task-template.md',
 ];
+
+/** Extra runner setup a toolchain needs before its install command works. */
+const SETUP_STEPS = {
+  python: "      - uses: actions/setup-python@v5\n        with:\n          python-version: '3.12'",
+  go: '      - uses: actions/setup-go@v5\n        with:\n          go-version: stable',
+  rust: '      - uses: dtolnay/rust-toolchain@stable',
+  ruby: "      - uses: ruby/setup-ruby@v1\n        with:\n          ruby-version: '3.3'\n          bundler-cache: true",
+  maven: "      - uses: actions/setup-java@v4\n        with:\n          distribution: temurin\n          java-version: '21'\n          cache: maven",
+  android: "      - uses: actions/setup-java@v4\n        with:\n          distribution: temurin\n          java-version: '17'\n          cache: gradle",
+  dotnet: '      - uses: actions/setup-dotnet@v4',
+  flutter: '      - uses: subosito/flutter-action@v2\n        with:\n          channel: stable',
+  php: '      - uses: shivammathur/setup-php@v2\n        with:\n          php-version: \'8.3\'',
+  elixir: "      - uses: erlef/setup-beam@v1\n        with:\n          otp-version: '27'\n          elixir-version: '1.17'",
+};
 
 const copied = [];
 const skipped = [];
@@ -189,7 +205,29 @@ const config = {
   },
 };
 
+const gatesUsable = Boolean(config.gates.command);
+
 for (const rel of PAYLOAD) copyPath(rel);
+
+// A CI workflow is not optional. The pipeline's quality model is "deterministic
+// gates decide what is acceptable" — without CI the gates only run wherever an
+// agent happens to run them, which is exactly the assurance we are trying not
+// to rely on.
+const workflowPath = join(target, '.github/workflows/ci.yml');
+let workflowNote;
+if (existsSync(workflowPath)) {
+  workflowNote = 'kept your existing .github/workflows/ci.yml — add the two platform steps by hand';
+} else if (!gatesUsable) {
+  workflowNote = 'skipped — no gate command to run (see the warning above)';
+} else {
+  const template = readFileSync(join(SOURCE, 'templates/ci.yml.template'), 'utf8');
+  const body = template.replace('{{SETUP_STEPS}}', SETUP_STEPS[detected?.id] ?? '');
+  if (!dryRun) {
+    mkdirSync(dirname(workflowPath), { recursive: true });
+    writeFileSync(workflowPath, body);
+  }
+  workflowNote = 'wrote .github/workflows/ci.yml';
+}
 
 const configPath = join(target, 'pipeline.config.json');
 const configExists = existsSync(configPath);
@@ -198,7 +236,6 @@ if (!configExists && !dryRun) {
 }
 
 console.log(`\nInstalling the agentic pipeline into ${target}${dryRun ? ' (dry run)' : ''}\n`);
-const gatesUsable = Boolean(config.gates.command);
 if (detected && gatesUsable) {
   console.log(`  Detected ${detected.language} in "${appDir}" — gates: ${config.gates.command}`);
 } else if (detected) {
@@ -241,15 +278,19 @@ if (skipped.length) {
   console.log(`  Skipped ${skipped.length} existing file(s) — review these yourself:`);
   for (const s of skipped) console.log(`            ${s}`);
 }
-console.log(configExists ? '  Kept    existing pipeline.config.json' : `  Wrote   pipeline.config.json`);
+console.log(configExists ? '  Kept    existing pipeline.config.json' : '  Wrote   pipeline.config.json');
+console.log(`  CI      ${workflowNote}`);
 
 console.log(`
 Next steps:
-  1. Check pipeline.config.json — especially gates.command; it must pass on a clean checkout.
-  2. Run it: cd ${relative(process.cwd(), join(target, appDir)) || '.'} && ${config.gates.command || '<your gate command>'}
-  3. Enable branch protection on main (PRs required) — the guard blocks pushes to main,
+  1. Verify the install:  node scripts/doctor.mjs
+     It checks every control the pipeline assumes it has, and tells you what to
+     do about anything missing.
+  2. Check pipeline.config.json — especially gates.command; it must pass on a clean checkout.
+  3. Run it: cd ${relative(process.cwd(), join(target, appDir)) || '.'} && ${config.gates.command || '<your gate command>'}
+  4. Enable branch protection on main (PRs required) — the guard blocks pushes to main,
      but only GitHub can enforce it for humans and other tools.
-  4. Open the project in Claude Code and run /pipeline-spec "<your first requirement>".
+  5. Open the project in Claude Code and run /pipeline-spec "<your first requirement>".
 
 Read docs/08-operator-guide.md in this repository for how the stages work.
 `);

@@ -4,6 +4,30 @@ An R&D project to build a highly autonomous, agentic software-development setup:
 
 **Sponsor:** Hasan Nadeem · **Lead:** Hasnat Ahmed · **Tracking:** Tehreem Raghib (weekly Friday standups)
 
+## Use this in your own project
+
+```sh
+git clone https://github.com/hasannadeem/dt-agentic-dev.git
+node dt-agentic-dev/scripts/init-pipeline.mjs /path/to/your/project
+cd /path/to/your/project && node scripts/doctor.mjs
+```
+
+The installer detects your toolchain (Node, Python, Go, Rust, Ruby, Java/Maven,
+.NET, PHP, Elixir, C/C++, Android, Swift, Flutter), writes a matching
+`pipeline.config.json` and CI workflow, and copies the agent team, stage
+commands and governance guard. It never overwrites existing files, so
+re-running is safe; `--dry-run` previews.
+
+`doctor.mjs` then verifies every control the pipeline assumes it has and tells
+you what to fix. **Two honest caveats before you rely on it:**
+
+- **Your project needs a real quality gate.** The whole safety model is a
+  command that fails when the code is wrong. The installer refuses to invent
+  one — a project with no tests gets a loud warning instead of a fake gate.
+- **CI cannot verify everything.** Mobile, kiosk and embedded work has behaviour
+  no gate can prove. See [docs/11-capability-tiers.md](docs/11-capability-tiers.md);
+  specs for those projects declare what a human must check on real hardware.
+
 ## Guiding priorities (in order)
 
 1. **Fastest possible execution and implementation**
