@@ -1,30 +1,29 @@
 # SPEC-003: API-Key Authentication
 
 **Status:** Draft
-**Requirement source:** poc/README.md sample requirements queue, item #3
-**Date:** 2026-09-08
+**Requirement source:** poc/README.md sample requirements queue, item #3 — "Add simple API-key authentication; unauthenticated requests are rejected with a proper error."
+**Date:** 2026-09-15
 
 ## Open questions & assumptions
 
-<!-- Deliberately first: the approver reads the doubts before the plan. -->
-- **Q:** Where is the valid API key configured?
-  **A (assumption):** A single key read from the `API_KEY` environment variable at server startup (mirrors the existing `PORT` pattern in `server.ts`). Per CLAUDE.md, agents never touch `.env`/secrets — a human sets `API_KEY` in the deployment environment. For tests, `createApp()` gains an optional config parameter so a key can be injected directly (mirrors the existing `store` injection pattern already used for perf/seed tests), bypassing env vars entirely.
-- **Q:** Which header carries the key?
-  **A (assumption):** A custom `X-API-Key` header, not `Authorization: Bearer`. `Bearer` implies OAuth2/JWT semantics (scopes, expiry, token issuance) this feature doesn't have; `X-API-Key` is the conventional, unambiguous choice for a single static shared secret.
-- **Q:** Which endpoints are protected — is `GET /health` exempt?
-  **A (assumption):** `GET /health` stays open (no key required) — it's used by monitoring/uptime tooling that typically can't hold the key, and it exposes no task data. Every `/tasks*` endpoint (`POST /tasks`, `GET /tasks`, `GET /tasks/overdue`, `POST /tasks/:id/complete`, `DELETE /tasks/:id`) requires the key.
-- **Q:** 401 vs 403 for missing vs. invalid key?
-  **A (assumption):** Both return `401`. This feature has exactly one permission tier (valid key or not) — there's no "authenticated but forbidden" case to justify `403`. Reuses the existing `{"error":{"message"}}` shape, `Content-Type: application/json`, unmodified from SPEC-001/002.
-- **Q:** Single shared key, or per-client keys?
-  **A (assumption):** One shared key for the whole POC, matching "simple API-key authentication" in the raw requirement. Per-client keys, issuance, rotation, and revocation are explicitly out of scope — flagging this as the item most likely to come back if this ever gates real multi-user traffic.
-- **Q:** Does the comparison need to be timing-safe?
-  **A (assumption):** Yes. A naive `===` string comparison leaks the key byte-by-byte via response-time side channels. This spec requires a constant-time comparison; deferring the exact primitive to implementation would leave a security decision to whichever library a developer agent happens to reach for.
-- **Q:** What happens when the server has no key configured?
-  **A (assumption):** Fail closed — every protected endpoint returns `503` with the standard error shape; `/health` still returns `200`. Rejected alternatives: fail-open (silently allows all unauthenticated traffic — unacceptable for a security feature) and crash-at-startup (turns a config oversight into a total outage with no diagnosable response).
-- **Q:** Rate limiting / lockout on repeated invalid-key attempts?
-  **A (assumption):** Out of scope for this spec. Follow-up if the API is ever exposed beyond the POC's trusted demo environment.
-- **Q:** Is this design-significant enough to require the architect stage before planning?
-  **A: Yes, explicitly.** This is called out in `poc/README.md` itself ("Requirement 3 is deliberately security-adjacent to exercise the architect and (later) security-auditor paths"). Auth touches every existing endpoint, introduces a new security-sensitive comparison primitive, and has failure-mode implications (see fail-closed decision above). Per repo convention this spec does not design the implementation — the **Design** section below is left for the architect to fill before `TASK-003.*` is written; the planner should not proceed straight from this Draft to tasks without that pass.
+- **[DECIDE] Q:** When the server starts with no key configured, should protected endpoints fail closed (reject everything) or fail open (allow everything)?
+  **Recommended:** Fail closed — every protected endpoint returns `503` with the standard error shape; `GET /health` still returns `200`. Fail-open would silently disable a security feature on a config oversight; crash-at-startup turns the same oversight into a total, undiagnosable outage. `503` makes the misconfiguration visible and recoverable without an outage.
+- **[DECIDE] Q:** Does `GET /health` require the API key, or does it stay open?
+  **Recommended:** Stays open. It's used by monitoring/uptime tooling that typically can't hold a key, and it exposes no task data — only a liveness flag.
+- **[DECIDE] Q:** One shared key for all clients, or per-client keys with individual issuance/rotation/revocation?
+  **Recommended:** One shared key, matching "simple API-key authentication" in the raw requirement and the POC's single-tenant scale. Per-client keys are the most likely piece of this to return if the API is ever exposed to multiple real clients — flagged here so it isn't built by accident now.
+- **[DECIDE] Q:** Is this feature design-significant enough to require the architect stage before task planning?
+  **Recommended:** Yes. `poc/README.md` calls this out explicitly ("Requirement 3 is deliberately security-adjacent to exercise the architect and ... security-auditor paths"). Auth touches every existing endpoint and introduces a new security-sensitive comparison primitive with a failure-mode decision (see fail-closed above) — the kind of cross-cutting, hard-to-reverse choice the architect stage exists for. The planner should not turn this Draft into tasks until the Design section below is filled and the spec is re-reviewed.
+- **[ASSUMED] Q:** Where is the valid key configured?
+  **A:** A single key read from the `API_KEY` environment variable at server startup, mirroring the existing `PORT` pattern in `server.ts`. Per CLAUDE.md, agents never touch `.env`/secrets — a human sets `API_KEY` in the deployment environment. `createApp()` gains an optional config parameter so tests can inject a key directly, mirroring the existing `store` injection seam already used for perf/seed tests.
+- **[ASSUMED] Q:** Which header carries the key?
+  **A:** A custom `X-API-Key` header, not `Authorization: Bearer`. `Bearer` implies OAuth2/JWT semantics (scopes, expiry, issuance) this feature doesn't have; `X-API-Key` is the conventional choice for a single static shared secret.
+- **[ASSUMED] Q:** 401 vs 403 for missing vs. invalid key?
+  **A:** Both return `401`, reusing the existing `{"error":{"message"}}` shape and `Content-Type: application/json` unmodified from SPEC-001/002. There is only one permission tier (valid key or not), so there's no "authenticated but forbidden" case to justify `403`.
+- **[ASSUMED] Q:** Does the comparison need to be timing-safe?
+  **A:** Yes — a naive `===` comparison leaks the key byte-by-byte via response-time side channels. This follows directly from "the comparison exists at all" once the feature is security-adjacent; the exact primitive is left to the architect/implementation, not re-litigated here.
+- **[ASSUMED] Q:** Rate limiting or lockout on repeated invalid-key attempts?
+  **A:** Out of scope for this POC-scale spec, consistent with SPEC-001/002's scope discipline. Follow-up only if the API is ever exposed beyond the trusted demo environment.
 
 ## Problem
 
@@ -49,8 +48,6 @@ The task API currently has no access control: any client that can reach the serv
 
 ## Acceptance criteria
 
-<!-- Objectively checkable. QA tests these verbatim; planner maps every one to a task.
-     Include performance budgets where relevant. -->
 1. `GET /health` with no `X-API-Key` header returns `200` (unauthenticated access allowed).
 2. A request to any of `POST /tasks`, `GET /tasks`, `GET /tasks/overdue`, `POST /tasks/:id/complete`, `DELETE /tasks/:id` with no `X-API-Key` header returns `401`, body `{"error":{"message":"<reason>"}}`, `Content-Type: application/json`; no task is created, returned, completed, or deleted.
 3. The same set of requests with `X-API-Key` present but not equal to the configured key returns `401` with the same shape; no task data is returned or mutated.
@@ -64,8 +61,14 @@ The task API currently has no access control: any client that can reach the serv
 
 ## Design
 
-<!-- Architect agent fills this section only for design-significant specs; otherwise delete. -->
-Design-significant — reserved for the architect agent (see final item in Open questions & assumptions). Do not proceed to task planning until this section is filled and the spec is re-reviewed.
+Design-significant — reserved for the architect agent (see "Is the architect stage required" above). Do not proceed to task planning until this section is filled and the spec is re-reviewed.
+
+## Questions for the approver
+
+1. No key configured at startup: fail closed with `503` on protected endpoints (recommended), or some other behavior (fail open / crash at startup)?
+2. Should `GET /health` stay unauthenticated, or should it also require the API key?
+3. Single shared key for the whole POC (recommended), or per-client keys with issuance/rotation/revocation now?
+4. Should this spec route through the architect stage before task planning (recommended: yes), or is it simple enough to go straight to tasks?
 
 ---
 *Target one page, ceiling two. Tasks derived from this spec: `tasks/TASK-003.*`.*
