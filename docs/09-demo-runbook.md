@@ -11,19 +11,19 @@
 1. `git checkout main && git pull` — clean tree, CI green on last commit
 2. `cd poc/app && npm ci && npm run gates` — verify green locally
 3. Open in split view: Claude Code, the GitHub PR page, and the timeline artifact
-4. Have requirement #3 (API-key auth) ready to paste (below) — SPEC-002 was used in the full rehearsal and is now the fallback material
+4. Open `specs/SPEC-003-api-key-auth.md` and confirm it still says `Status: Draft` — it was generated in advance, and approving it is the live human gate
 5. **Fallback prepared** (see bottom) in case of live-demo gremlins
 
 ## The live flow (with talking points)
 
 **1. Show the finished runs first (2 min)** — open the merged PRs (#1–#4, task API) and the rehearsal PRs (#5–#6, due dates — where review caught a timezone bug before merge). Talking point: "This has already happened twice for real — today you'll watch it live."
 
-**2. `/pipeline-spec` (5 min)** — paste the requirement:
+**2. The spec the agent wrote (5 min)** — open `specs/SPEC-003-api-key-auth.md`, generated in advance from one sentence:
 > "Add simple API-key authentication; unauthenticated requests are rejected with a proper error."
 
-Note: auth is security-adjacent, so the pipeline may pull in the **architect** stage for a design record and will exercise the **security-auditor** — a richer show than a plain CRUD feature.
+It is not generated live, deliberately. SPEC-003 already existed, so a live `/pipeline-spec` would have produced a duplicate SPEC-004 and the planning step would then have picked up the wrong file — and live generation is the likeliest place for a demo to stall.
 
-While the agent works, show `.claude/agents/requirements-analyst.md` — "each agent is a small text file with a narrow job; anyone can read or improve them." When the spec lands, scroll the **Open questions & assumptions section first** — talking point: "the agent tells me what it guessed *before* I approve; I own the acceptance criteria, it owns the typing."
+Show `.claude/agents/requirements-analyst.md` first — "each agent is a small text file with a narrow job; anyone can read or improve them." Then scroll to **Questions for the approver** at the bottom and walk the `[DECIDE]` items. Talking point: "one sentence in, and the agent separated what it could decide by convention from what only a human should decide. It asks me about those, and nothing else." Auth is security-adjacent, so the spec also asks for the **architect** stage before planning.
 
 **3. Human gate #1 (1 min)** — flip `Draft → Approved` on screen. "That's decision one of two."
 
