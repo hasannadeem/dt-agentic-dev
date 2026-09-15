@@ -12,7 +12,8 @@ For developers cloning this repo to try the pipeline. You operate the gates; the
 node scripts/init-pipeline.mjs /path/to/your/project
 ```
 
-It detects your toolchain (Node, Python, Go, Rust, Ruby), copies the agent team,
+It detects your toolchain (Node, Python, Go, Rust, Ruby, Java/Maven, .NET, PHP,
+Elixir, C/C++, Android, Swift, Flutter), copies the agent team,
 stage commands, governance guard, conventions and templates into your repo, and
 writes a `pipeline.config.json` describing your layout and gate command. Existing
 files are never overwritten, so re-running is safe — add `--dry-run` to preview.
@@ -76,9 +77,9 @@ The human touchpoints are exactly two: **approve the spec (acceptance criteria)*
 Stated plainly, because you will hit these:
 
 - **Windows is a supported target, not a verified one.** Nobody has run this pipeline on Windows yet. The guardrail hook shells out to `python3` and the helper scripts assume a POSIX shell, so Git Bash or WSL is required and native PowerShell is untested. If you are our first Windows operator, expect friction and file it.
-- **Test-suite flake is reduced, not eliminated.** Perf loops now bind one server each, but ~70 single-shot `request(app)` sites still bind a fresh ephemeral port per call, which can collide with other local processes and return a response from the wrong server (an impossible status like `404` from a valid `POST`). Tracked as `tasks/TASK-000.3-suite-wide-server-reuse.md`. A re-run usually passes; that is the signature.
+- **Test isolation depends on sequential requests.** Each test file binds one server and repoints it per request, which removed the suite's port-collision flake entirely (71 per-call binds to zero, TASK-000.3). The trade-off: requests must be issued and awaited one at a time — see the constraints on `setupTestServer()` in `poc/app/tests/support/server.ts` before writing concurrent HTTP tests.
 - **The guard inspects command text, not intent.** It blanks quoted strings and heredoc bodies before matching, so a commit message mentioning a forbidden command is fine — but a sufficiently creative shell construction (`eval`, base64, unusual redirection) could still slip past. It defends against agent mistakes, not a determined adversary. Server-side branch protection is the backstop; enable it.
-- **Non-Node toolchains are generated, not proven.** The installer emits sensible gate commands for Python, Go, Rust and Ruby (`ruff && mypy && pytest`, `go vet && go test`, and so on), but no project in those languages has yet run a full pipeline cycle. Expect to adjust `gates.command`.
+- **Non-Node toolchains are generated, not proven.** The installer emits gate commands checked against each toolchain's documentation, but no project outside Node has yet run a full pipeline cycle. Expect to adjust `gates.command`.
 - **Governance failures have happened and were not caught by automation.** In one day: an agent committed to `main`, the orchestrator pushed it, and the orchestrator later committed code to `main` directly. Tests passed and CI was green through all three. What caught them was an agent comparing commit *contents* against commit *claims*. Do not assume green CI means the process was followed.
 
 ## Known sharp edges

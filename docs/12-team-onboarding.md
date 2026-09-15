@@ -58,7 +58,6 @@ Review the PR and merge it. That is the loop.
 
 - **The reviewer will reject things, and it is usually right.** In our runs it caught a timezone bug that would have made a feature behave differently per deployment region, and a test that could never fail. Do not wave it through.
 - **A stage will sometimes fail twice and escalate to you.** That is the designed behaviour, not a malfunction.
-- **Occasional flaky test failures.** Known issue, tracked as `TASK-000.3`; a re-run usually passes.
 - **First feature takes longer than doing it yourself.** The gain arrives from the third feature on, once the specs and conventions give the agents context.
 
 ## When something goes wrong
@@ -66,7 +65,7 @@ Review the PR and merge it. That is the loop.
 | Symptom | What it means | What to do |
 |---|---|---|
 | An agent says it is "blocked" and stops | The guard refused something, or it hit a real ambiguity | Read the message. Stopping is correct behaviour here — never work around a guard |
-| Tests fail intermittently, impossible statuses | Known ephemeral-port flake | Re-run. If it persists, tell the lead |
+| A test fails once and passes on re-run | Not expected — the suite's known flake was fixed | Report it with the failing output. Intermittent failures are defects, not background noise |
 | Planner refuses to run | The spec is still `Draft` | Approve it. Only a human can |
 | CI red on a convention check | An artifact breaks a naming or status rule | `node scripts/validate-artifacts.mjs` names the file and the rule |
 | Pipeline command does nothing | You invoked it with no argument | The requirement goes on the same line as the command |
