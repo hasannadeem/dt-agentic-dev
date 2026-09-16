@@ -1,6 +1,6 @@
 # SPEC-003: API-Key Authentication
 
-**Status:** Draft
+**Status:** Approved
 **Requirement source:** poc/README.md sample requirements queue, item #3 — "Add simple API-key authentication; unauthenticated requests are rejected with a proper error."
 **Date:** 2026-09-15
 
@@ -61,7 +61,84 @@ The task API currently has no access control: any client that can reach the serv
 
 ## Design
 
-Design-significant — reserved for the architect agent (see "Is the architect stage required" above). Do not proceed to task planning until this section is filled and the spec is re-reviewed.
+<!-- Architect stage, 2026-09-16. Design decision record for SPEC-003. -->
+
+### Decision
+
+One Express middleware, mounted on the `/tasks` path prefix **before** `express.json()`. It has two parts: a pure comparison function, and a handler factory that reads the key it is given. The rest of the auth decision (the fail-closed `503`) lives inside the middleware.
+
+**Where the code lives:** a new file, `poc/app/src/auth/apiKey.ts`. It follows the `src/validation/` pattern: a pure function with its own unit test. It exports two functions:
+
+```ts
+// Constant-time, exact, case-sensitive. false for undefined/missing input.
+export function apiKeyMatches(provided: string | undefined, expected: string): boolean;
+
+// expectedKey undefined => 503 on every request (fail closed).
+export function requireApiKey(expectedKey: string | undefined): RequestHandler;
+```
+
+**Comparison.** Use `createHash('sha256')` and `timingSafeEqual`, both imported from `'node:crypto'`:
+- If `provided` is `undefined`, return `false`.
+- Otherwise compute the SHA-256 digests of `provided` and `expected` and return `timingSafeEqual(digestA, digestB)`.
+- Why hash first: both digests are always 32 bytes. Without hashing, `timingSafeEqual` would need the length check it throws on, and that check would leak the key's length.
+- Compute the expected digest once, when `requireApiKey` is called, not on every request.
+
+**Middleware behavior, in order:**
+1. If `expectedKey` is `undefined`, respond `sendError(res, 503, 'authentication is not configured')`.
+2. Else if `apiKeyMatches(req.get('X-API-Key'), expectedKey)` is false, respond `sendError(res, 401, 'missing or invalid API key')`. The message is fixed text, the same for missing and wrong keys (AC6).
+3. Otherwise call `next()`.
+
+**Wiring:**
+- **`app.ts` signature.** Change it to `createApp(store = new TaskStore(), config: AppConfig = {})`, where `AppConfig` is `{ apiKey?: string }`. The existing `createApp(seedStore)` seam keeps working. If `config` is omitted there is no key, so the default is fail-closed.
+- **Route order in `app.ts`.** Register `GET /health` first, then `app.use('/tasks', requireApiKey(config.apiKey))`, then `app.use(express.json())`, then the existing routes and error handler, unchanged.
+- **`server.ts`.** Read `process.env.API_KEY` and treat an empty string as not configured (`process.env.API_KEY || undefined`). Pass it through `createApp(undefined, { apiKey })`. If no key is configured, print one startup warning with `console.error`. The warning names the `API_KEY` variable and never prints its value.
+
+### Rejected alternatives
+
+- **Middleware attached route by route** (`app.get('/tasks', requireApiKey, handler)` and so on). Every future `/tasks*` route would have to remember to opt in, and forgetting would leave that route open with no error. Mounting on the prefix protects every current and future `/tasks*` route by default. It also uses Express's own path matching, so case and trailing-slash variants are covered the same way the route handlers match them.
+- **Global middleware with a `/health` allowlist** (deny everything, allow `/health`). This would also reject unknown routes like `GET /nope` with `401`. The existing `health.test.ts` and `tasks-overdue.test.ts` assert `404` there. It would also go beyond the approved scope, which covers `/tasks*` only.
+
+### Consequences and constraints for the developer
+
+1. **The middleware must stay before `express.json()`.** A request without a key must not have its body parsed. Unauthenticated malformed JSON therefore gets `401`, not `400`. With a valid key, the SPEC-001 #3 `400` behavior is unchanged.
+2. **`createApp` must never read `process.env`.** Only `server.ts` reads the environment. This keeps tests sealed off from whatever `API_KEY` happens to be set in CI or on a developer's shell.
+3. **The existing test suite will fail until it is updated.** Fail-closed means all 52 existing `createApp()` calls in tests now get `503`. Changes needed:
+   - Put a single `TEST_API_KEY` and helpers in `tests/support/`: one builds an app with the key, one sends requests with the header.
+   - Existing test files change only their setup lines. Assertions must not be edited, removed, or weakened (AC9). The reviewer should check the diff for exactly that.
+   - Unauthenticated and `503` tests must build their app and requests explicitly, not through the helper.
+4. **Planner sequencing.**
+   - `apiKeyMatches`, `requireApiKey`, and their unit tests can land first as a standalone task, not yet wired into the app.
+   - Wiring, the `server.ts` change, and the test-suite migration must ship together in one PR, or the gates go red.
+5. **AC7 test.** Use `vi.mock('node:crypto', async (importOriginal) => ({ ...(await importOriginal()), timingSafeEqual: vi.fn(<actual>) }))` and assert the mock was called. This only works if `apiKey.ts` imports from exactly `'node:crypto'`, so keep that import specifier.
+6. **AC5 tests must include:**
+   - a prefix of the key
+   - the key plus a suffix
+   - a case-flipped key
+   - a same-length wrong key
+   - an empty header value
+7. **AC8 tests** must cover both `createApp()` with no config and `apiKey: undefined`. The empty-string case is normalized in `server.ts`, so unit-test that normalization too. Pull it into a small exported function if needed for testability.
+8. **AC10 performance.** There is deliberately no switch to turn auth off, so a no-auth baseline app can't be built in the same test run. Verify AC10 with two checks:
+   - (a) Rerun the existing SPEC-002 #16 overdue performance test with a valid key and confirm p95 is still under 150ms.
+   - (b) Time `apiKeyMatches` in isolation over at least 1,000 calls and assert p95 under 5ms.
+   - Do not add a test-only bypass flag to `createApp`.
+9. **Routes outside `/tasks` are not protected.** Any future spec that adds a top-level path outside `/tasks` must decide its own auth explicitly.
+
+### Security notes (for security-auditor)
+
+- **Empty key.** `API_KEY=""` must behave as not configured (`503`). It must never match an empty or whitespace `X-API-Key` header. This is the most likely fail-open bug.
+- **Path-variant bypass.** Confirm the prefix mount cannot be bypassed by path variants. Check each of these without a key and expect `401`:
+  - `GET /TASKS`
+  - `GET /tasks/`
+  - `GET /Tasks/overdue`
+  - `POST /tasks/x/complete`
+  - `HEAD /tasks`
+  - `OPTIONS /tasks`
+- **Constant-time comparison.** Verify there is no early return on length and no `===` or `Buffer.equals` on key material. The only early return allowed is for a missing header, which reveals nothing the caller doesn't already know.
+- **Key disclosure.** The key value, or the submitted header, must not appear in any response body, error message, or log line. That includes the startup warning.
+- **Parsing order.** Unauthenticated requests must not reach `express.json()`, which parses bodies up to 100kb. The ordering in constraint 1 exists for this.
+- **No `WWW-Authenticate` header.** `401` is sent without this header, a deliberate small deviation from RFC 9110 §15.5.2, because `X-API-Key` is not a registered auth scheme. Auditor to confirm this is acceptable at POC scale.
+- **Header whitespace.** Node strips leading and trailing whitespace from header values. A configured key with surrounding whitespace can therefore never match, and all protected requests get `401`. That fails closed, but operators should set a key of printable ASCII with no surrounding whitespace.
+- **Accepted risks, out of scope by spec:** no rate limiting or lockout, no TLS (the key travels in cleartext unless something in front of the app terminates TLS), and the key is held in process memory and the environment.
 
 ## Questions for the approver
 
