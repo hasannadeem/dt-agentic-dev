@@ -71,6 +71,18 @@ describe('apiKeyMatches', () => {
     expect(apiKeyMatches(KEY.slice(0, -1), KEY)).toBe(false);
   });
 
+  it('returns false for a provided value with trailing whitespace, even though it would match once trimmed', () => {
+    expect(apiKeyMatches(`${KEY} `, KEY)).toBe(false);
+  });
+
+  it('returns false for a provided value with leading whitespace', () => {
+    expect(apiKeyMatches(` ${KEY}`, KEY)).toBe(false);
+  });
+
+  it('returns false when provided is whitespace-only, even against a matching whitespace-only expected value', () => {
+    expect(apiKeyMatches('   ', '   ')).toBe(false);
+  });
+
   it('imports and invokes timingSafeEqual from node:crypto during a comparison', () => {
     timingSafeEqualSpy.mockClear();
 
@@ -83,6 +95,18 @@ describe('apiKeyMatches', () => {
     // Both are SHA-256 digests, not the raw key material.
     expect(a).toHaveLength(32);
     expect(b).toHaveLength(32);
+  });
+
+  it('invokes timingSafeEqual even when provided and expected have different lengths (no length-based early return)', () => {
+    // Guards against a shortcut like `if (provided.length !== expected.length)
+    // return false;`, which would leak the configured key's length via a
+    // fast, hash-free early return. If that shortcut is (re)introduced,
+    // timingSafeEqual is skipped for this case and the assertion below fails.
+    timingSafeEqualSpy.mockClear();
+
+    apiKeyMatches(KEY.slice(0, 10), KEY);
+
+    expect(timingSafeEqualSpy).toHaveBeenCalledTimes(1);
   });
 
   it('does not invoke timingSafeEqual when provided is undefined (missing-header early return)', () => {
@@ -112,6 +136,69 @@ describe('requireApiKey', () => {
       });
       expect(next).not.toHaveBeenCalled();
     }
+  });
+
+  it('responds 503 when the configured key is an empty string', () => {
+    const handler = requireApiKey('');
+    const next = vi.fn() as unknown as NextFunction;
+    const req = createMockRequest(KEY);
+    const res = createMockResponse();
+
+    handler(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith({
+      error: { message: 'authentication is not configured' },
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('responds 503 when the configured key is whitespace-only', () => {
+    const handler = requireApiKey('   ');
+    const next = vi.fn() as unknown as NextFunction;
+    const req = createMockRequest('   ');
+    const res = createMockResponse();
+
+    handler(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith({
+      error: { message: 'authentication is not configured' },
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('responds 401, never next(), when the header is empty or whitespace-only', () => {
+    const handler = requireApiKey(KEY);
+    const next = vi.fn() as unknown as NextFunction;
+
+    for (const headerValue of ['', '   ']) {
+      const req = createMockRequest(headerValue);
+      const res = createMockResponse();
+
+      handler(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({
+        error: { message: 'missing or invalid API key' },
+      });
+    }
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('responds 401 when the header carries the correct key plus trailing whitespace', () => {
+    const handler = requireApiKey(KEY);
+    const next = vi.fn() as unknown as NextFunction;
+    const req = createMockRequest(`${KEY} `);
+    const res = createMockResponse();
+
+    handler(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({
+      error: { message: 'missing or invalid API key' },
+    });
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('responds 401 with a fixed message when the header is missing', () => {
