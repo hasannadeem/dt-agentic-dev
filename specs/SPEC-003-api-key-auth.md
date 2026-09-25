@@ -1,6 +1,6 @@
 # SPEC-003: API-Key Authentication
 
-**Status:** Draft
+**Status:** Approved
 **Requirement source:** poc/README.md sample requirements queue, item #3 — "Add simple API-key authentication; unauthenticated requests are rejected with a proper error."
 **Date:** 2026-09-15
 
@@ -32,6 +32,7 @@ The task API currently has no access control: any client that can reach the serv
 ## Scope
 
 **In:**
+
 - A single shared API key, configured at server startup, required via header on all `/tasks*` endpoints.
 - `GET /health` remains open, unauthenticated.
 - Missing or wrong key → `401`, standard error shape, no task data returned or mutated.
@@ -39,6 +40,7 @@ The task API currently has no access control: any client that can reach the serv
 - Explicit, defined behavior when no key is configured server-side (fail closed, `503`).
 
 **Out (explicitly not doing):**
+
 - Per-client/multiple keys, key issuance, rotation, or revocation endpoints.
 - Any role/permission model beyond "has a valid key or doesn't" (no `403`, no scopes).
 - Persistent/hashed key storage — single in-memory comparison against one configured value, POC scale only.
@@ -61,7 +63,76 @@ The task API currently has no access control: any client that can reach the serv
 
 ## Design
 
-Design-significant — reserved for the architect agent (see "Is the architect stage required" above). Do not proceed to task planning until this section is filled and the spec is re-reviewed.
+### Decision
+
+Two new modules plus a wiring change in `app.ts`/`server.ts`. No new dependencies — `node:crypto` covers everything.
+
+**1. `poc/app/src/auth/apiKey.ts` — pure, separately unit-tested (mirrors `src/validation/*`).**
+
+```ts
+export function normalizeConfiguredKey(raw: string | undefined): string | null;
+export function createKeyMatcher(configuredKey: string): (presented: string | undefined) => boolean;
+```
+
+- `normalizeConfiguredKey` trims; `undefined`, `''`, or whitespace-only → `null` (meaning "not configured").
+- `createKeyMatcher` computes `createHash('sha256')` of the configured key **once**, at app construction, and returns a closure that compares `sha256(presented ?? '')` against it with `timingSafeEqual`. Comparing fixed-width 32-byte digests (rather than raw key bytes) is what makes this both constant-time *and* length-non-leaking: `timingSafeEqual` throws `RangeError` on unequal-length buffers, so a raw-bytes comparison would have to branch on length first and thereby leak it. No `===` fallback after the digest match — SHA-256 collision is not a POC threat and a second comparison only adds a way to get it wrong.
+
+**2. `poc/app/src/middleware/requireApiKey.ts` — Express glue (new `middleware/` dir, matching the existing `store/`, `models/`, `validation/` layout).**
+
+```ts
+export interface AuthConfig { apiKey: string | null }
+export function requireApiKey(config: AuthConfig): RequestHandler;
+```
+
+- `config.apiKey === null` → `sendError(res, 503, 'api key authentication is not configured')`.
+- No match → `sendError(res, 401, 'missing or invalid api key')` — one constant string for both the missing and wrong cases (AC6).
+- Match → `next()`.
+- Reuses the existing `sendError` helper, so the `{"error":{"message"}}` shape and `Content-Type` are unchanged from SPEC-001/002 by construction.
+
+**3. Wiring in `createApp` — registration order is the load-bearing part.**
+
+`createApp(store: TaskStore = new TaskStore(), config: AuthConfig = { apiKey: null })`, registering in exactly this order:
+
+1. `app.get('/health', ...)` — before the gate, so it stays open (AC1).
+2. `app.use(requireApiKey(config))` — **global deny-by-default**, not path-mounted on `/tasks`.
+3. `app.use(express.json())` — **after** the gate.
+4. Task routes, then the existing body-parse error handler last.
+
+Auth sits before `express.json()` so an unauthenticated request is rejected without parsing an untrusted body: no CPU spent on anonymous payloads, and a malformed-JSON body can't preempt the `401` with a `400` (AC2 requires `401` for *any* keyless request to `POST /tasks`).
+
+The default `{ apiKey: null }` means an app built with no config fails closed (AC8) rather than being accidentally open.
+
+**4. `server.ts`** passes `{ apiKey: normalizeConfiguredKey(process.env.API_KEY) }`. `app.ts` stays free of `process.env`, preserving today's split where only `server.ts` reads the environment (the `PORT` pattern).
+
+**5. Tests.** New `poc/app/tests/support/app.ts` exporting `TEST_API_KEY` and `createTestApp(store?)`; new `tests/auth.test.ts` (AC1–4, 6, 8) and `tests/apiKey.test.ts` (AC5, 7 — asserts the constant-time primitive by inspection, no wall-clock timing).
+
+### Rejected alternatives
+
+1. **Path-mounted gate, `app.use('/tasks', requireApiKey(config))`.** Smaller diff and it leaves the existing unknown-route test alone, but it is allow-by-default: any future route registered outside the `/tasks` prefix is silently public, and nothing fails to tell you. For a security gate the correct default is deny, and the public allowlist is currently one line (`/health`).
+2. **Plain `===`, or hashing the key at rest with bcrypt/argon2.** `===` short-circuits on the first differing byte and directly violates AC7. Password-hashing a static shared secret is the wrong tool at the wrong layer: the spec explicitly excludes persistent/hashed key storage, and it would add a dependency plus deliberate per-request cost against the 5ms budget in AC10.
+
+### Constraints the developer must respect
+
+- **Registration order in `createApp` is a correctness requirement, not style.** `/health` → auth → `express.json()` → routes → error handler. Add a comment saying so, in the style of the existing `/tasks/overdue` ordering comment in `app.ts`.
+- **Deny-by-default changes unknown-route behavior.** Without a valid key, `GET /nope` now returns `401`, not `404`. This is intended (it doesn't reveal which routes exist) but it **breaks the existing `tests/health.test.ts` "unknown routes return 404" test**, which must be updated to send a valid key. It does not conflict with any SPEC-001/002 acceptance criterion.
+- **Migrate all 51 existing `createApp(...)` call sites** across `tests/tasks.test.ts` (20), `tests/tasks-overdue.test.ts` (18), `tests/tasks-complete-delete.test.ts` (11), `tests/health.test.ts` (2) to `createTestApp(...)` plus `.set('X-API-Key', TEST_API_KEY)`, in the same PR (AC9).
+- **The sequential-request constraint in `tests/support/server.ts` still applies** — that harness repoints one shared server synchronously. Do not write concurrent/`Promise.all` auth tests; they pass against the wrong app and fail silently.
+- `API_KEY=""` or whitespace-only must be treated as *unconfigured* (`503`), never as a valid key that an empty header would match.
+- Never log, echo, or include the presented key in any response body or error message.
+- Only ever call `timingSafeEqual` on two equal-length SHA-256 digests.
+- Hash the configured key once per app instance, not per request (AC10).
+- Duplicate `X-API-Key` headers arrive joined as `"a, b"` and will therefore fail to match → `401`. Acceptable; do not special-case it.
+- Do not create or edit `.env*` (CLAUDE.md safety rail). Document `API_KEY` in `poc/README.md` only; a human sets the real value.
+- Do not add rate limiting, lockout, or auth audit logging — explicitly out of scope above.
+
+### Security implications — for the security-auditor
+
+- **The comparison primitive** in `src/auth/apiKey.ts`: confirm it is genuinely constant-time over the digest and leaks neither key bytes nor key length.
+- **Gate coverage:** confirm no route reaches a handler without passing `requireApiKey` — including unknown paths, and that the trailing body-parse error handler cannot emit task data.
+- **Ordering:** confirm auth is registered before `express.json()` so unauthenticated bodies are never parsed.
+- **Response uniformity:** `401` wording identical for missing vs. wrong key, no key echoed, key absent from logs and error bodies.
+- **Fail-closed:** verify `503` on unconfigured, including the `API_KEY=""` and whitespace-only cases, while `/health` still returns `200`.
+- **Accepted residual risks** (in scope to note, not to block): no TLS at this layer (reverse-proxy assumption), no brute-force rate limiting, and a single shared key with no rotation or revocation path.
 
 ## Questions for the approver
 
@@ -71,4 +142,5 @@ Design-significant — reserved for the architect agent (see "Is the architect s
 4. Should this spec route through the architect stage before task planning (recommended: yes), or is it simple enough to go straight to tasks?
 
 ---
-*Target one page, ceiling two. Tasks derived from this spec: `tasks/TASK-003.*`.*
+
+_Target one page, ceiling two. Tasks derived from this spec: `tasks/TASK-003._`.\*
