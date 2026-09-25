@@ -105,6 +105,20 @@ describe('createKeyMatcher', () => {
     expect(b).toHaveLength(32);
   });
 
+  it("returns false when timingSafeEqual reports no match, even for the correct key (rules out a `presented === configuredKey` short-circuit)", () => {
+    const matches = createKeyMatcher('correct-key');
+    timingSafeEqualSpy.mockReturnValueOnce(false);
+
+    expect(matches('correct-key')).toBe(false);
+  });
+
+  it("returns true when timingSafeEqual reports a match, even for a differing key (rules out a `presented === configuredKey` short-circuit)", () => {
+    const matches = createKeyMatcher('correct-key');
+    timingSafeEqualSpy.mockReturnValueOnce(true);
+
+    expect(matches('wrong-key')).toBe(true);
+  });
+
   it('computes the configured key digest once at construction, not per comparison', () => {
     const matches = createKeyMatcher('correct-key');
 

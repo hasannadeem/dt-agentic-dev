@@ -3,7 +3,7 @@
 **Spec:** SPEC-003 (specs/SPEC-003-api-key-auth.md)
 **Size:** S
 **Depends on:** none — parallelizable
-**Status:** Todo
+**Status:** In review
 **Branch:** task/003.1-apikey-module
 
 ## Intent
