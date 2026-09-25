@@ -14,7 +14,7 @@ Add the Express glue that turns `apiKey.ts`'s pure matcher into deny-by-default 
 
 - New `poc/app/src/middleware/` directory (matching the existing `store/`, `models/`, `validation/` layout), file `requireApiKey.ts`.
 - `export interface AuthConfig { apiKey: string | null }` and `export function requireApiKey(config: AuthConfig): RequestHandler`.
-- `config.apiKey === null` → `sendError(res, 503, 'api key authentication is not configured')`, return.
+- `config.apiKey` re-run through `normalizeConfiguredKey` (`null`, `''`, or whitespace-only, all normalize to "not configured") → `sendError(res, 503, 'api key authentication is not configured')`, return.
 - Otherwise build the matcher (via `createKeyMatcher(config.apiKey)`) and check `req.header('X-API-Key')`; no match → `sendError(res, 401, 'missing or invalid api key')` (identical string for both missing and wrong — do not branch the message on which case it is); match → `next()`.
 - Reuse the existing `sendError` helper from `src/errors.ts` unmodified, so the `{"error":{"message"}}` shape and `Content-Type` stay as-is.
 

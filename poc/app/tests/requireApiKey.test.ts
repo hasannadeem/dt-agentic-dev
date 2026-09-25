@@ -4,9 +4,14 @@ import { requireApiKey } from '../src/middleware/requireApiKey.js';
 
 const TEST_KEY = 'correct-key';
 
+// Only answers `req.header('X-API-Key')`; any other header name returns
+// `undefined`, so a middleware reading the wrong header name (e.g.
+// 'Authorization') gets no value and the surrounding test fails instead of
+// silently passing.
 function createMockRequest(headerValue?: string): Request {
+  const header = vi.fn((name: string) => (name === 'X-API-Key' ? headerValue : undefined));
   const req: Partial<Request> = {
-    header: vi.fn().mockReturnValue(headerValue) as unknown as Request['header'],
+    header: header as unknown as Request['header'],
   };
   return req as Request;
 }
@@ -159,6 +164,7 @@ describe('requireApiKey', () => {
       expect(next).toHaveBeenCalledTimes(1);
       expect(res.status).not.toHaveBeenCalled();
       expect(res.json).not.toHaveBeenCalled();
+      expect(req.header).toHaveBeenCalledWith('X-API-Key');
     });
   });
 });
