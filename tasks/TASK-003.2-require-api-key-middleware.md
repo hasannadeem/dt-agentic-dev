@@ -3,7 +3,7 @@
 **Spec:** SPEC-003 (specs/SPEC-003-api-key-auth.md)
 **Size:** S
 **Depends on:** TASK-003.1 (pure `apiKey.ts` module)
-**Status:** Todo
+**Status:** In review
 **Branch:** task/003.2-require-api-key-middleware (stacked on task/003.1-apikey-module)
 
 ## Intent
