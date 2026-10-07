@@ -30,8 +30,14 @@ export function normalizeConfiguredKey(raw: string | undefined): string | null {
  * on `.length`, leaking it. There is no `===` fallback after the digest
  * comparison.
  *
- * The returned function never throws: a missing/`undefined` presented value
- * is hashed as the empty string and simply fails to match.
+ * The returned function never throws for a missing/`undefined` or a
+ * `string` presented value — `undefined` is hashed as the empty string and
+ * simply fails to match. It is *not* throw-safe for a non-string presented
+ * value: `createHash().update()` rejects anything that isn't a string,
+ * `Buffer`, `TypedArray`, or `DataView` with a `TypeError`. Callers that
+ * cannot guarantee the value they pass in is `string | undefined` (e.g. a
+ * caller that bypasses TypeScript's static check) must not treat this as
+ * throw-free.
  */
 export function createKeyMatcher(
   configuredKey: string,

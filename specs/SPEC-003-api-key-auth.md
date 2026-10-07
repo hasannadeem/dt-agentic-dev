@@ -84,7 +84,7 @@ export interface AuthConfig { apiKey: string | null }
 export function requireApiKey(config: AuthConfig): RequestHandler;
 ```
 
-- `config.apiKey === null` → `sendError(res, 503, 'api key authentication is not configured')`.
+- `config.apiKey` re-run through `normalizeConfiguredKey` (`null`, `''`, or whitespace-only, all normalize to "not configured") → `sendError(res, 503, 'api key authentication is not configured')`.
 - No match → `sendError(res, 401, 'missing or invalid api key')` — one constant string for both the missing and wrong cases (AC6).
 - Match → `next()`.
 - Reuses the existing `sendError` helper, so the `{"error":{"message"}}` shape and `Content-Type` are unchanged from SPEC-001/002 by construction.
